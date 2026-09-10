@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freightoscope - Activity Reminder Management</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <!-- Dayjs for precision datetime calculation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/relativeTime.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isSameOrAfter.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isSameOrBefore.min.js"></script>
+  <script>
+    dayjs.extend(window.dayjs_plugin_relativeTime);
+    dayjs.extend(window.dayjs_plugin_isSameOrAfter);
+    dayjs.extend(window.dayjs_plugin_isSameOrBefore);
+  </script>
+
+  <!-- React 18 & ReactDOM -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+  <!-- Custom Freightoscope Styles -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap');
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f6f9;
+      color: #181818;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Exact Freightoscope Navy Blue Sidebar */
+    .bg-freight-navy {
+      background-color: #16325c;
+    }
+    .bg-freight-navy-dark {
+      background-color: #0f2341;
+    }
+    .bg-freight-blue-active {
+      background-color: #0070d2;
+    }
+    .text-freight-blue {
+      color: #0070d2;
+    }
+    .border-freight-blue {
+      border-color: #0070d2;
+    }
+
+    /* Button Navy */
+    .btn-freight-primary {
+      background-color: #16325c;
+      color: #ffffff;
+      border: 1px solid #16325c;
+      transition: all 0.15s ease;
+    }
+    .btn-freight-primary:hover {
+      background-color: #102445;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c1c7d0;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a6b0be;
+    }
+
+    /* Table styles */
+    .freight-table th {
+      background-color: #fafafb;
+      color: #3e3e3c;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: none;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px 12px;
+    }
+    .freight-table td {
+      font-size: 13px;
+      color: #181818;
+      border-bottom: 1px solid #eef0f3;
+      padding: 10px 12px;
+      vertical-align: middle;
+    }
+    .freight-table tr:hover td {
+      background-color: #f8fafc;
+    }
+
+    /* Tab active underline */
+    .tab-active {
+      color: #16325c;
+      font-weight: 600;
+      border-bottom: 3px solid #0070d2;
+    }
+    .tab-inactive {
+      color: #54698d;
+      font-weight: 500;
+      border-bottom: 3px solid transparent;
+    }
+    .tab-inactive:hover {
+      color: #16325c;
+    }
+
+    /* Segmented selector button */
+    .type-btn-active {
+      border: 1.5px solid #0070d2;
+      color: #0070d2;
+      background-color: #ffffff;
+      font-weight: 600;
+    }
+    .type-btn-inactive {
+      border: 1px solid #d8dde6;
+      color: #3e3e3c;
+      background-color: #ffffff;
+    }
+    .type-btn-inactive:hover {
+      background-color: #f8fafc;
+      border-color: #b0adab;
+    }
+
+    /* Modal / Drawer animations */
+    .drawer-slide-in {
+      animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+      }
+      to {
+        transform: translateX(0);
+      }
+    }
+
+    .animate-scale-in {
+      animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* Form input styling */
+    .freight-input, .freight-select {
+      border: 1px solid #d8dde6;
+      border-radius: 4px;
+      padding: 7px 10px;
+      font-size: 13px;
+      color: #181818;
+      background-color: #ffffff;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      width: 100%;
+    }
+    .freight-input:focus, .freight-select:focus {
+      border-color: #0070d2;
+      box-shadow: 0 0 0 1px #0070d2;
+    }
+    .freight-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #3e3e3c;
+      margin-bottom: 4px;
+    }
+    .required-star {
+      color: #ea001e;
+      margin-left: 2px;
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col select-none">
+  <div id="root" class="h-full flex flex-col"></div>
+
+  <!-- React Application Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Standard Reminder Duration Options
+    const REMINDER_DURATION_OPTIONS = [
+      { value: 5, label: "5 minutes before" },
+      { value: 10, label: "10 minutes before" },
+      { value: 15, label: "15 minutes before" },
+      { value: 30, label: "30 minutes before" },
+      { value: 50, label: "50 minutes before" },
+      { value: 60, label: "1 hour before" }
+    ];
+
+    // Initial Default Settings per Activity Type
+    const INITIAL_SETTINGS = [
+      { id: "calls", activityType: "Calls", durationMinutes: 15, status: "Active", modifiedBy: "System", lastModified: "Sep 9, 2026, 1:23:00 PM" },
+      { id: "email", activityType: "Email", durationMinutes: 15, status: "Active", modifiedBy: "System", lastModified: "Sep 9, 2026, 1:23:00 PM" },
+      { id: "meeting", activityType: "Meeting", durationMinutes: 30, status: "Active", modifiedBy: "System", lastModified: "Sep 9, 2026, 1:23:00 PM" },
+      { id: "task", activityType: "Task", durationMinutes: 15, status: "Active", modifiedBy: "System", lastModified: "Sep 9, 2026, 1:23:00 PM" }
+    ];
+
+    // Initial Sample Activities (dynamically relative to current time so page refresh is clean)
+    // 2 Activities of each Activity Type: Calls, Email, Meeting, Task
+    const getInitialActivities = () => {
+      const base = dayjs();
+      return [
+        // CALLS (2 Activities)
+        {
+          id: "ACT-101",
+          title: "Follow-up Call regarding Air Cargo Quote",
+          activityType: "Calls",
+          activityDate: base.add(1, "hour").minute(15).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 0,
+          durationMinutes: 15,
+          party: "DHL Global Forwarding",
+          opportunity: "Air Charter - Pharma Batch",
+          contacts: "Anita Desai",
+          direction: "Outbound",
+          purpose: "Follow Up",
+          outcome: "New",
+          status: "New",
+          priority: "High",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Discuss temperature-controlled container availability.",
+          reminderDurationMinutes: 15,
+          hasReminder: true
+        },
+        {
+          id: "ACT-102",
+          title: "Outbound Sales Pitch - Ocean Freight FY27",
+          activityType: "Calls",
+          activityDate: base.add(3, "hour").minute(30).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 0,
+          durationMinutes: 30,
+          party: "DB Schenker India",
+          opportunity: "LCL Consolidation Contract",
+          contacts: "Amit Shah",
+          direction: "Outbound",
+          purpose: "Sales Pitch",
+          outcome: "In Progress",
+          status: "In Progress",
+          priority: "Medium",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Present volume discount schedule for Q3.",
+          reminderDurationMinutes: 15,
+          hasReminder: true
+        },
+
+        // EMAIL (2 Activities)
+        {
+          id: "ACT-103",
+          title: "Send Revised Rate Sheet for Mundra Port Route",
+          activityType: "Email",
+          activityDate: base.add(45, "minute").second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 0,
+          durationMinutes: 15,
+          party: "Kuehne + Nagel Logistics",
+          opportunity: "Refrigerated Container Services",
+          contacts: "Pooja Sharma",
+          direction: "Outbound",
+          purpose: "Quote Submission",
+          outcome: "New",
+          status: "New",
+          priority: "High",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Attach updated fuel surcharge breakdown.",
+          reminderDurationMinutes: 15,
+          hasReminder: true
+        },
+        {
+          id: "ACT-104",
+          title: "Share Customs Clearance Documentation Checklist",
+          activityType: "Email",
+          activityDate: base.add(5, "hour").minute(0).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 0,
+          durationMinutes: 15,
+          party: "Apex Maritime Services",
+          opportunity: "Customs Brokerage FY26",
+          contacts: "Sanjay Patel",
+          direction: "Outbound",
+          purpose: "Status Check",
+          outcome: "In Progress",
+          status: "In Progress",
+          priority: "Low",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Send Form A and Bill of Lading templates.",
+          reminderDurationMinutes: 15,
+          hasReminder: true
+        },
+
+        // MEETING (2 Activities)
+        {
+          id: "ACT-105",
+          title: "Contract Review Meeting with Maersk Logistics",
+          activityType: "Meeting",
+          activityDate: base.add(2, "hour").minute(0).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 1,
+          durationMinutes: 0,
+          party: "Maersk Line India Pvt Ltd",
+          opportunity: "Ocean Freight Contract 2026",
+          contacts: "Rajesh Kumar",
+          direction: "Outbound",
+          purpose: "Contract Review",
+          outcome: "Pending",
+          status: "In Progress",
+          priority: "High",
+          owner: "Shreshth Dubey",
+          teamMembers: ["Vikram Seth"],
+          notes: "Review freight rates for Jawaharlal Nehru Port to Rotterdam route.",
+          reminderDurationMinutes: 30,
+          hasReminder: true
+        },
+        {
+          id: "ACT-106",
+          title: "Quarterly Business Review with Hapag-Lloyd",
+          activityType: "Meeting",
+          activityDate: base.add(6, "hour").minute(15).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 1,
+          durationMinutes: 30,
+          party: "Hapag-Lloyd India",
+          opportunity: "Asia-Europe Ocean Corridor",
+          contacts: "Klaus Weber",
+          direction: "Outbound",
+          purpose: "Business Review",
+          outcome: "New",
+          status: "New",
+          priority: "Medium",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Review Q2 performance and container turnaround times.",
+          reminderDurationMinutes: 30,
+          hasReminder: true
+        },
+
+        // TASK (2 Activities)
+        {
+          id: "ACT-107",
+          title: "Prepare Air Freight Tariff Comparison Sheet",
+          activityType: "Task",
+          activityDate: base.add(1, "hour").minute(45).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 0,
+          durationMinutes: 45,
+          party: "FedEx Trade Networks",
+          opportunity: "Express Freight Procurement",
+          contacts: "Priya Nair",
+          direction: "Internal",
+          purpose: "Analysis",
+          outcome: "In Progress",
+          status: "In Progress",
+          priority: "High",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Compare spot rates against contract rates.",
+          reminderDurationMinutes: 15,
+          hasReminder: true
+        },
+        {
+          id: "ACT-108",
+          title: "Verify Import Duty Tariffs for Chemical Batch",
+          activityType: "Task",
+          activityDate: base.add(4, "hour").minute(30).second(0).format("YYYY-MM-DDTHH:mm:ss"),
+          durationHours: 0,
+          durationMinutes: 30,
+          party: "Agility Logistics",
+          opportunity: "Hazmat Cargo Clearance",
+          contacts: "Rohan Mehta",
+          direction: "Internal",
+          purpose: "Compliance Check",
+          outcome: "New",
+          status: "New",
+          priority: "Medium",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: "Cross-check HS codes with customs database.",
+          reminderDurationMinutes: 15,
+          hasReminder: true
+        }
+      ];
+    };
+
+    // Helper: Format Date String nicely
+    const formatDateTime = (isoString) => {
+      if (!isoString) return "-";
+      return dayjs(isoString).format("MMM D, YYYY, h:mm:ss A");
+    };
+
+    const formatDateShort = (isoString) => {
+      if (!isoString) return "-";
+      return dayjs(isoString).format("MMM D, YYYY, h:mm A");
+    };
+
+    // Main Prototype Component
+    function FreightoscopeApp() {
+      // Custom time control - allows setting a specific time for testing
+      const [useCustomTime, setUseCustomTime] = useState(false);
+      const [customTime, setCustomTime] = useState(() => dayjs().format("YYYY-MM-DDTHH:mm"));
+      const [currentTime, setCurrentTime] = useState(() => dayjs().toISOString());
+      const [timezone, setTimezone] = useState("Asia/Kolkata (GMT+5:30)");
+      const [isDevToolOpen, setIsDevToolOpen] = useState(false);
+      const [justSavedOrChangedTime, setJustSavedOrChangedTime] = useState(false);
+
+      // Update current time based on mode (real or custom)
+      useEffect(() => {
+        if (!useCustomTime) {
+          // Use real current time
+          setCurrentTime(dayjs().toISOString());
+          const timer = setInterval(() => {
+            setCurrentTime(dayjs().toISOString());
+          }, 60000); // Update every 60 seconds
+          return () => clearInterval(timer);
+        }
+      }, [useCustomTime]);
+
+      // Navigation State
+      const [activeNav, setActiveNav] = useState("activities"); // "activities" | "settings"
+      const [settingsTab, setSettingsTab] = useState("activity-reminder"); // "lead-stage" | "opp-stage" | "activity-status" | "activity-reminder"
+      const [activitySubTab, setActivitySubTab] = useState("all"); // "all" | "Calls" | "Email" | "Meeting" | "Task"
+      const [searchQuery, setSearchQuery] = useState("");
+
+      // Settings State
+      const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem("fs_reminder_settings");
+        return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+      });
+
+      // Helper to dynamically adjust activity dates to the current day if saved data is from a past/different date
+      const autoUpdateActivitiesToCurrentDate = (items) => {
+        if (!items || items.length === 0) return getInitialActivities();
+        
+        const now = dayjs();
+        const firstActDate = dayjs(items[0].activityDate);
+        
+        // If the saved data is from a previous calendar day, shift all activity dates to today's date
+        if (!firstActDate.isSame(now, "day")) {
+          const diffDays = now.startOf("day").diff(firstActDate.startOf("day"), "day");
+          return items.map((act) => {
+            const originalDate = dayjs(act.activityDate);
+            const shiftedDate = originalDate.add(diffDays, "day");
+            const isFuture = shiftedDate.isSameOrAfter(now);
+            return {
+              ...act,
+              activityDate: shiftedDate.format("YYYY-MM-DDTHH:mm:ss"),
+              hasReminder: isFuture
+            };
+          });
+        }
+        return items;
+      };
+
+      // Activities State
+      const [activities, setActivities] = useState(() => {
+        const saved = localStorage.getItem("fs_activities");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const cleaned = parsed.map((a) => ({
+            ...a,
+            contacts: a.contacts ? a.contacts.replace(/\s*\([^)]*\)/g, "") : a.contacts
+          }));
+          if (cleaned.length < 8) return getInitialActivities();
+          return autoUpdateActivitiesToCurrentDate(cleaned);
+        }
+        return getInitialActivities();
+      });
+
+      // Drawer & Modal States
+      const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+      const [editingActivity, setEditingActivity] = useState(null);
+      const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+      const [editingSetting, setEditingSetting] = useState(null);
+      const [toastMessage, setToastMessage] = useState(null);
+      const [notifTab, setNotifTab] = useState("all"); // "all" | "read" | "unread"
+      const [notifSearchQuery, setNotifSearchQuery] = useState("");
+
+      // Form State for Drawer
+      const [formData, setFormData] = useState({
+        activityType: "Calls",
+        title: "",
+        party: "",
+        opportunity: "",
+        contacts: "",
+        activityDate: "2026-09-09T16:00:00",
+        durationHours: 0,
+        durationMinutes: 15,
+        reminderDurationMinutes: 15,
+        isReminderUserOverridden: false,
+        direction: "Outbound",
+        purpose: "Sales Pitch",
+        outcome: "New",
+        status: "New",
+        priority: "Low",
+        owner: "Shreshth Dubey",
+        teamMembers: [],
+        notes: ""
+      });
+
+      // Persist Settings & Activities
+      useEffect(() => {
+        localStorage.setItem("fs_reminder_settings", JSON.stringify(settings));
+      }, [settings]);
+
+      useEffect(() => {
+        localStorage.setItem("fs_activities", JSON.stringify(activities));
+      }, [activities]);
+
+      // Show Toast Utility
+      const showToast = (msg, type = "success") => {
+        setToastMessage({ text: msg, type });
+        setTimeout(() => setToastMessage(null), 3500);
+      };
+
+      // Reminders Snooze & Dismiss State
+      const [dismissedReminders, setDismissedReminders] = useState(() => {
+        const saved = localStorage.getItem("fs_dismissed_reminders");
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      const [snoozedReminders, setSnoozedReminders] = useState(() => {
+        const saved = localStorage.getItem("fs_snoozed_reminders");
+        return saved ? JSON.parse(saved) : {};
+      });
+
+      // Persist Snooze & Dismiss
+      useEffect(() => {
+        localStorage.setItem("fs_dismissed_reminders", JSON.stringify(dismissedReminders));
+      }, [dismissedReminders]);
+
+      useEffect(() => {
+        localStorage.setItem("fs_snoozed_reminders", JSON.stringify(snoozedReminders));
+      }, [snoozedReminders]);
+
+      // ==========================================
+      // REMINDER ENGINE (Rules AC1 - AC18 + Alert Modal + Snooze / Dismiss)
+      // ==========================================
+      // Automatically derive and evaluate all Reminders based on Activities and Current Time
+      const reminders = useMemo(() => {
+        const now = dayjs(currentTime);
+        const list = [];
+
+        activities.forEach((act) => {
+          const actDate = dayjs(act.activityDate);
+
+          // A reminder exists if explicitly enabled (scheduled for future date when created/saved)
+          const hasReminder = act.hasReminder !== undefined
+            ? act.hasReminder
+            : actDate.isSameOrAfter(dayjs(act.createdAt || "2026-09-09T15:00:00"));
+
+          if (!hasReminder) {
+            return;
+          }
+
+          const remId = `REM-${act.id}`;
+          const duration = act.reminderDurationMinutes || 15;
+          const defaultTriggerDate = actDate.subtract(duration, "minute");
+
+          // Check Snooze & Dismiss state
+          const snoozedUntilStr = snoozedReminders[remId];
+          const isSnoozedActive = Boolean(snoozedUntilStr && dayjs(snoozedUntilStr).isAfter(now));
+          const effectiveTriggerDate = (snoozedUntilStr && !isSnoozedActive) 
+            ? dayjs(snoozedUntilStr) 
+            : defaultTriggerDate;
+
+          const isTriggered = now.isSameOrAfter(effectiveTriggerDate);
+          const isDismissed = dismissedReminders.includes(remId);
+
+          let statusText = "Scheduled";
+          if (isDismissed) {
+            statusText = "Dismissed / Read";
+          } else if (isSnoozedActive) {
+            statusText = `Snoozed (until ${dayjs(snoozedUntilStr).format("h:mm A")})`;
+          } else if (isTriggered) {
+            statusText = "ALERTING (Due Now)";
+          }
+
+          list.push({
+            id: remId,
+            activityId: act.id,
+            subject: act.title || "Untitled Activity",
+            activityType: act.activityType,
+            activityDate: act.activityDate,
+            reminderDate: defaultTriggerDate.toISOString(),
+            effectiveTriggerDate: effectiveTriggerDate.toISOString(),
+            durationMinutes: duration,
+            source: "Sales Activity",
+            sourceNumber: "", // Prompt AC15: Source Number remains empty
+            timezone: timezone,
+            status: statusText,
+            isPending: !isDismissed && !isSnoozedActive && !isTriggered,
+            isTriggered: isTriggered,
+            isDismissed: isDismissed,
+            isSnoozed: isSnoozedActive,
+            isAlerting: isTriggered && !isDismissed && !isSnoozedActive,
+            party: act.party,
+            opportunity: act.opportunity,
+            contacts: act.contacts,
+            notes: act.notes,
+            owner: act.owner
+          });
+        });
+
+        return list;
+      }, [activities, currentTime, timezone, dismissedReminders, snoozedReminders]);
+
+      // Reminders that are currently triggering
+      const activeAlertingReminders = useMemo(() => {
+        return reminders.filter((r) => r.isAlerting);
+      }, [reminders]);
+
+      // Active reminder to display in the central On-Screen Popup Modal (opens automatically when trigger time is reached)
+      const activeAlertModalReminder = useMemo(() => {
+        if (justSavedOrChangedTime) return null; // Grace period during demos to prevent immediate popup slam
+        return activeAlertingReminders.find((r) => !r.isDismissed) || null;
+      }, [activeAlertingReminders, justSavedOrChangedTime]);
+
+      // Filtered reminders for the Notifications Panel (All / Read / Unread + Search)
+      const filteredNotificationReminders = useMemo(() => {
+        return reminders.filter((rem) => {
+          // Tab filter
+          if (notifTab === "read" && !rem.isDismissed) return false;
+          if (notifTab === "unread" && rem.isDismissed) return false;
+
+          // Search filter
+          if (notifSearchQuery.trim()) {
+            const q = notifSearchQuery.toLowerCase();
+            const titleMatch = rem.subject.toLowerCase().includes(q);
+            const partyMatch = rem.party ? rem.party.toLowerCase().includes(q) : false;
+            const ownerMatch = rem.owner ? rem.owner.toLowerCase().includes(q) : false;
+            return titleMatch || partyMatch || ownerMatch;
+          }
+          return true;
+        });
+      }, [reminders, notifTab, notifSearchQuery]);
+
+      // Snooze & Dismiss Action Handlers
+      const handleSnoozeReminder = (reminderId, minutes) => {
+        const snoozeUntil = dayjs(currentTime).add(minutes, "minute").toISOString();
+        setSnoozedReminders((prev) => ({
+          ...prev,
+          [reminderId]: snoozeUntil
+        }));
+        showToast(`Reminder snoozed for ${minutes} min (until ${dayjs(snoozeUntil).format("h:mm A")}).`);
+      };
+
+      const handleDismissReminder = (reminderId) => {
+        setDismissedReminders((prev) => {
+          if (!prev.includes(reminderId)) return [...prev, reminderId];
+          return prev;
+        });
+        setSnoozedReminders((prev) => {
+          const next = { ...prev };
+          delete next[reminderId];
+          return next;
+        });
+        showToast("Reminder marked as read and dismissed.");
+      };
+
+      const handleDismissAllReminders = () => {
+        const allPending = reminders.filter(r => !r.isDismissed).map((r) => r.id);
+        setDismissedReminders((prev) => Array.from(new Set([...prev, ...allPending])));
+        showToast("All notifications dismissed.");
+      };
+
+      const handleMarkAllRead = () => {
+        const allIds = reminders.map((r) => r.id);
+        setDismissedReminders(allIds);
+        showToast("All notifications marked as read.");
+      };
+
+      // Dev Time Controller Fast-Forward & Reset
+      const handleFastForward = (minutes) => {
+        const baseTime = dayjs(customTime || currentTime);
+        const nextTime = baseTime.add(minutes, "minute").format("YYYY-MM-DDTHH:mm");
+        setCustomTime(nextTime);
+      };
+
+      const handleResetRealTime = () => {
+        setUseCustomTime(false);
+        const realNow = dayjs().format("YYYY-MM-DDTHH:mm");
+        setCustomTime(realNow);
+        setCurrentTime(dayjs().toISOString());
+        setJustSavedOrChangedTime(true);
+        setTimeout(() => setJustSavedOrChangedTime(false), 3000);
+        showToast("Reset clock to real system time.");
+      };
+
+      const handleApplyCustomTime = () => {
+        if (customTime) {
+          setCurrentTime(dayjs(customTime).toISOString());
+          setUseCustomTime(true);
+          setIsDevToolOpen(false);
+          setJustSavedOrChangedTime(true);
+          setTimeout(() => setJustSavedOrChangedTime(false), 3000);
+          showToast(`Simulated time set to ${dayjs(customTime).format("h:mm A")}.`);
+        } else {
+          setIsDevToolOpen(false);
+        }
+      };
+
+      // Dynamic Title & Icon based on Activity Type for Enterprise Reminder Popup Modal
+      const getReminderHeaderInfo = (type) => {
+        switch ((type || "").toLowerCase()) {
+          case "calls":
+            return { title: "Upcoming Phone Call Reminder", icon: "fa-solid fa-phone" };
+          case "meeting":
+            return { title: "Upcoming Meeting Reminder", icon: "fa-solid fa-calendar-check" };
+          case "email":
+            return { title: "Email Action Reminder", icon: "fa-solid fa-envelope-open-text" };
+          case "task":
+            return { title: "Task Reminder", icon: "fa-solid fa-list-check" };
+          default:
+            return { title: "Upcoming Activity Reminder", icon: "fa-solid fa-bell" };
+        }
+      };
+
+      // Get Default Duration for an Activity Type from Settings
+      const getDefaultDurationForType = (type) => {
+        const row = settings.find((s) => s.activityType.toLowerCase() === type.toLowerCase());
+        return row ? row.durationMinutes : 15;
+      };
+
+      // Open Drawer for New Activity
+      const handleOpenCreateDrawer = (presetType = "Calls") => {
+        const defaultDur = getDefaultDurationForType(presetType);
+        // Default activity time: 1 hour from current simulated time
+        const defaultActTime = dayjs(currentTime).add(1, "hour").minute(0).second(0).format("YYYY-MM-DDTHH:mm:00");
+
+        setEditingActivity(null);
+        setFormData({
+          activityType: presetType,
+          title: "",
+          party: "Select Party or Lead",
+          opportunity: "Select Opportunity",
+          contacts: "Select Contacts",
+          activityDate: defaultActTime,
+          durationHours: 0,
+          durationMinutes: 30,
+          reminderDurationMinutes: defaultDur,
+          isReminderUserOverridden: false,
+          direction: presetType === "Calls" ? "Select Call Direction" : "Select Direction",
+          purpose: presetType === "Calls" ? "Select Call Purpose" : "Select Purpose",
+          outcome: presetType === "Calls" ? "Select Call Outcome" : "Select Outcome",
+          status: "New",
+          priority: "Low",
+          owner: "Shreshth Dubey",
+          teamMembers: [],
+          notes: ""
+        });
+        setIsDrawerOpen(true);
+      };
+
+      // Open Drawer for Editing Activity
+      const handleOpenEditDrawer = (activity) => {
+        setEditingActivity(activity);
+        setFormData({
+          activityType: activity.activityType,
+          title: activity.title,
+          party: activity.party || "Select Party or Lead",
+          opportunity: activity.opportunity || "Select Opportunity",
+          contacts: activity.contacts || "Select Contacts",
+          activityDate: activity.activityDate,
+          durationHours: activity.durationHours || 0,
+          durationMinutes: activity.durationMinutes || 15,
+          reminderDurationMinutes: activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType),
+          isReminderUserOverridden: true,
+          direction: activity.direction || "Select Direction",
+          purpose: activity.purpose || "Select Purpose",
+          outcome: activity.outcome || "Select Outcome",
+          status: activity.status || "New",
+          priority: activity.priority || "Low",
+          owner: activity.owner || "Shreshth Dubey",
+          teamMembers: activity.teamMembers || [],
+          notes: activity.notes || ""
+        });
+        setIsDrawerOpen(true);
+      };
+
+      // When Activity Type changes in Drawer: update default reminder if not explicitly overridden
+      const handleTypeChange = (newType) => {
+        const newDefault = getDefaultDurationForType(newType);
+        setFormData((prev) => ({
+          ...prev,
+          activityType: newType,
+          reminderDurationMinutes: prev.isReminderUserOverridden ? prev.reminderDurationMinutes : newDefault
+        }));
+      };
+
+      // When User explicitly changes Reminder dropdown in Drawer
+      const handleReminderDurationChange = (minutes) => {
+        setFormData((prev) => ({
+          ...prev,
+          reminderDurationMinutes: parseInt(minutes),
+          isReminderUserOverridden: true
+        }));
+      };
+
+      // Save Activity
+      const handleSaveActivity = (e) => {
+        e.preventDefault();
+        if (!formData.title.trim()) {
+          alert("Please enter an Activity Title.");
+          return;
+        }
+
+        const actDate = dayjs(formData.activityDate);
+        const now = dayjs(currentTime);
+        const isFutureAtSave = actDate.isSameOrAfter(now);
+
+        const targetId = editingActivity ? editingActivity.id : `ACT-${Date.now().toString().slice(-4)}`;
+        const remId = `REM-${targetId}`;
+
+        // Clear prior dismissal and snooze state when an activity is created or rescheduled
+        setDismissedReminders((prev) => prev.filter((id) => id !== remId));
+        setSnoozedReminders((prev) => {
+          const next = { ...prev };
+          delete next[remId];
+          return next;
+        });
+
+        // Grace period during demos so popup does not slam immediately after clicking Save
+        setJustSavedOrChangedTime(true);
+        setTimeout(() => setJustSavedOrChangedTime(false), 3000);
+
+        if (editingActivity) {
+          // Edit Activity
+          const updated = activities.map((act) => {
+            if (act.id === editingActivity.id) {
+              return {
+                ...act,
+                ...formData,
+                id: act.id,
+                hasReminder: isFutureAtSave
+              };
+            }
+            return act;
+          });
+          setActivities(updated);
+          showToast(`Activity "${formData.title}" updated successfully.`);
+        } else {
+          // Create Activity
+          const newAct = {
+            ...formData,
+            id: targetId,
+            hasReminder: isFutureAtSave,
+            createdAt: currentTime
+          };
+          setActivities([newAct, ...activities]);
+          showToast(`Activity "${newAct.title}" created.`);
+        }
+
+        setIsDrawerOpen(false);
+      };
+
+      // Delete Activity
+      const handleDeleteActivity = (id) => {
+        if (confirm("Are you sure you want to delete this activity?")) {
+          setActivities(activities.filter((a) => a.id !== id));
+          showToast("Activity deleted.");
+        }
+      };
+
+      // Update Sales Setting
+      const handleSaveSetting = (settingId, newMinutes) => {
+        const updated = settings.map((s) => {
+          if (s.id === settingId) {
+            return {
+              ...s,
+              durationMinutes: parseInt(newMinutes),
+              lastModified: dayjs().format("MMM D, YYYY, h:mm:ss A"),
+              modifiedBy: "Shreshth Dubey (Admin)"
+            };
+          }
+          return s;
+        });
+        setSettings(updated);
+        setEditingSetting(null);
+        showToast(`Default reminder for ${settingId} updated to ${newMinutes} minutes.`);
+      };
+
+      // Filtered Activities
+      const filteredActivities = useMemo(() => {
+        return activities.filter((act) => {
+          const matchesSubTab = activitySubTab === "all" || act.activityType.toLowerCase() === activitySubTab.toLowerCase();
+          const matchesQuery = !searchQuery ||
+            act.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            act.party.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            act.owner.toLowerCase().includes(searchQuery.toLowerCase());
+          return matchesSubTab && matchesQuery;
+        });
+      }, [activities, activitySubTab, searchQuery]);
+
+      // Counts for Subtabs
+      const subtabCounts = useMemo(() => {
+        return {
+          all: activities.length,
+          Calls: activities.filter((a) => a.activityType === "Calls").length,
+          Email: activities.filter((a) => a.activityType === "Email").length,
+          Meeting: activities.filter((a) => a.activityType === "Meeting").length,
+          Task: activities.filter((a) => a.activityType === "Task").length
+        };
+      }, [activities]);
+
+      // Calculate helper preview for Reminder inside drawer
+      const reminderCalculationPreview = useMemo(() => {
+        if (!formData.activityDate) return null;
+        const actDate = dayjs(formData.activityDate);
+        const now = dayjs(currentTime);
+        const isFuture = actDate.isAfter(now);
+
+        if (!isFuture) {
+          return {
+            type: "warning",
+            text: "Activity date is in the past — no reminder will be scheduled."
+          };
+        }
+
+        const trigger = actDate.subtract(formData.reminderDurationMinutes, "minute");
+        const isTriggerPast = trigger.isBefore(now);
+
+        if (isTriggerPast) {
+          return {
+            type: "warning",
+            text: `Calculated trigger (${trigger.format("h:mm A")}) is already in the past relative to current time (${now.format("h:mm A")}).`
+          };
+        }
+
+        return {
+          type: "success",
+          text: `Reminder will trigger at ${trigger.format("MMM D, YYYY, h:mm A")} (${formData.reminderDurationMinutes} min before activity)`
+        };
+      }, [formData.activityDate, formData.reminderDurationMinutes, currentTime]);
+
+      // Check if selected form date is in the past
+      const isPastActivityDate = useMemo(() => {
+        if (!formData.activityDate) return false;
+        return dayjs(formData.activityDate).isBefore(dayjs(currentTime));
+      }, [formData.activityDate, currentTime]);
+
+      // Reset All Data to Clean Initial State
+      const handleResetData = () => {
+        if (confirm("Reset all activities and settings to initial prototype defaults?")) {
+          setActivities(getInitialActivities());
+          setSettings(INITIAL_SETTINGS);
+          setDismissedReminders([]);
+          setSnoozedReminders({});
+          setUseCustomTime(false);
+          setCurrentTime(dayjs().toISOString());
+          showToast("Data reset to initial defaults.");
+        }
+      };
+
+      return (
+        <div className="flex h-screen w-screen bg-[#f4f6f9] text-[#181818] overflow-hidden">
+          {/* ==================================================== */}
+          {/* LEFT SIDEBAR NAVIGATION (Matching Freightoscope)     */}
+          {/* ==================================================== */}
+          <aside className="w-64 bg-[#16325c] text-white flex flex-col justify-between flex-shrink-0 z-20 select-none shadow-md relative">
+
+            {/* Top Brand Header */}
+            <div>
+              <div className="h-14 px-4 flex items-center justify-between border-b border-[#214373]">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm border border-white/20 overflow-hidden flex-shrink-0">
+                    <img src="logo.png" alt="Freightoscope Logo" className="w-full h-full object-contain" />
+                  </div>
+                  <span className="font-extrabold tracking-wider text-sm text-white">FREIGHTOSCOPE</span>
+                </div>
+                <button className="text-gray-300 hover:text-white text-base">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              {/* Search Job # Input */}
+              <div className="p-3">
+                <div className="flex items-center bg-white rounded overflow-hidden shadow-inner h-8">
+                  <input
+                    type="text"
+                    placeholder="Search Job #..."
+                    className="w-full px-2 text-xs text-gray-800 outline-none bg-transparent"
+                  />
+                  <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-1 border-l border-gray-200 font-semibold cursor-pointer">
+                    JOB# <i className="fa-solid fa-caret-down text-[8px] ml-0.5"></i>
+                  </span>
+                  <button className="bg-[#16325c] text-white px-2.5 h-full flex items-center justify-center hover:bg-[#0f2341]">
+                    <i className="fa-solid fa-magnifying-glass text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation Menu */}
+              <nav className="mt-1 text-[13px] font-normal space-y-0.5">
+
+                {/* Dashboard */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-gauge-high w-4 text-center"></i>
+                    <span>Dashboard</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+
+                {/* Admin */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-universal-access w-4 text-center"></i>
+                    <span>Admin</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+
+                {/* Masters */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-table-cells-large w-4 text-center"></i>
+                    <span>Masters</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+
+                {/* Sales (Expanded) */}
+                <div>
+                  <div className="flex items-center justify-between px-4 py-2 bg-[#1b3c6d] cursor-pointer text-white font-medium">
+                    <div className="flex items-center space-x-3">
+                      <i className="fa-solid fa-chart-line w-4 text-center"></i>
+                      <span>Sales</span>
+                    </div>
+                    <i className="fa-solid fa-caret-down text-[10px] text-gray-300"></i>
+                  </div>
+
+                  {/* Sub-menu items */}
+                  <div className="bg-[#132c52] py-1 text-xs space-y-0.5">
+
+                    {/* Leads */}
+                    <div className="flex items-center space-x-3 pl-8 pr-4 py-1.5 hover:bg-[#1a3763] cursor-pointer text-gray-300">
+                      <i className="fa-solid fa-folder text-[11px]"></i>
+                      <span>Leads</span>
+                    </div>
+
+                    {/* Opportunities */}
+                    <div className="flex items-center space-x-3 pl-8 pr-4 py-1.5 hover:bg-[#1a3763] cursor-pointer text-gray-300">
+                      <i className="fa-solid fa-folder text-[11px]"></i>
+                      <span>Opportunities</span>
+                    </div>
+
+                    {/* Activities (Active Nav Option) */}
+                    <div
+                      onClick={() => setActiveNav("activities")}
+                      className={`flex items-center justify-between pl-8 pr-4 py-1.5 cursor-pointer transition-colors ${
+                        activeNav === "activities"
+                          ? "text-[#00c2ff] font-bold"
+                          : "text-gray-300 hover:bg-[#1a3763]"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <i className={`fa-solid fa-folder text-[11px] ${activeNav === "activities" ? "text-[#00c2ff]" : ""}`}></i>
+                        <span>Activities</span>
+                      </div>
+                    </div>
+
+                    {/* Contacts */}
+                    <div className="flex items-center space-x-3 pl-8 pr-4 py-1.5 hover:bg-[#1a3763] cursor-pointer text-gray-300">
+                      <i className="fa-solid fa-folder text-[11px]"></i>
+                      <span>Contacts</span>
+                    </div>
+
+                    {/* Settings (Active Nav Option) */}
+                    <div
+                      onClick={() => {
+                        setActiveNav("settings");
+                        setSettingsTab("activity-reminder");
+                      }}
+                      className={`flex items-center justify-between pl-8 pr-4 py-1.5 cursor-pointer transition-colors ${
+                        activeNav === "settings"
+                          ? "bg-[#0070d2] text-white font-semibold"
+                          : "text-gray-300 hover:bg-[#1a3763]"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <i className="fa-solid fa-folder text-[11px]"></i>
+                        <span>Settings</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pricing */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-tag w-4 text-center"></i>
+                    <span>Pricing</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+
+                {/* Operations */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-earth-americas w-4 text-center"></i>
+                    <span>Operations</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+
+                {/* Accounts */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-file-invoice-dollar w-4 text-center"></i>
+                    <span>Accounts</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+
+                {/* Reports */}
+                <div className="flex items-center justify-between px-4 py-2 hover:bg-[#1f4070] cursor-pointer text-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <i className="fa-solid fa-chart-column w-4 text-center"></i>
+                    <span>Reports</span>
+                  </div>
+                  <i className="fa-solid fa-caret-right text-[10px] text-gray-400"></i>
+                </div>
+              </nav>
+            </div>
+
+            {/* Bottom Toolbar & Notification Bell */}
+            <div className="border-t border-[#214373] bg-[#112747]">
+              <div className="flex items-center justify-around py-2.5 text-gray-300">
+
+                {/* History */}
+                <button title="History" className="hover:text-white p-1">
+                  <i className="fa-solid fa-clock-rotate-left text-sm"></i>
+                </button>
+
+                {/* Tasks */}
+                <button title="Tasks" className="hover:text-white p-1">
+                  <i className="fa-regular fa-circle-check text-sm"></i>
+                </button>
+
+                {/* User */}
+                <button title="User Profile" className="hover:text-white p-1">
+                  <i className="fa-regular fa-circle-user text-sm"></i>
+                </button>
+
+                {/* Notification Bell (Live Reminder Count) */}
+                <button
+                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                  title="View Activity Notifications"
+                  className={`relative px-2 py-1 rounded transition-all flex items-center justify-center ${
+                    isNotificationOpen
+                      ? "bg-[#0070d2] text-white shadow-inner font-bold"
+                      : "text-gray-300 hover:text-white"
+                  }`}
+                >
+                  <i className="fa-solid fa-bell text-sm text-yellow-300"></i>
+                  <span className="absolute -top-1.5 -right-2 bg-[#4bca81] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shadow border border-[#112747]">
+                    {reminders.filter((r) => !r.isDismissed).length}
+                  </span>
+                </button>
+
+                {/* Sync / Reset Demo Data */}
+                <button title="Reset Demo Data" onClick={handleResetData} className="hover:text-white p-1">
+                  <i className="fa-solid fa-arrows-rotate text-sm"></i>
+                </button>
+
+                {/* Logout */}
+                <button title="Logout" className="hover:text-white p-1">
+                  <i className="fa-solid fa-power-off text-sm"></i>
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* ==================================================== */}
+          {/* MAIN CONTENT AREA                                    */}
+          {/* ==================================================== */}
+          <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+
+            {/* Toast Notification */}
+            {toastMessage && (
+              <div className="absolute top-4 right-6 z-50 bg-[#16325c] text-white px-4 py-2.5 rounded shadow-xl border border-blue-400 text-xs flex items-center space-x-2 animate-bounce">
+                <i className="fa-solid fa-circle-check text-green-400"></i>
+                <span>{toastMessage.text}</span>
+              </div>
+            )}
+
+            {/* ==================================================== */}
+            {/* VIEW 1: ACTIVITIES LISTING PAGE                      */}
+            {/* ==================================================== */}
+            {activeNav === "activities" && (
+              <div className="flex-1 overflow-y-auto p-5">
+
+                {/* Header Row */}
+                <div className="flex items-center justify-between mb-4">
+                  <h1 className="text-xl font-bold text-[#181818]">Activities</h1>
+                  <button
+                    onClick={() => handleOpenCreateDrawer("Calls")}
+                    className="btn-freight-primary font-semibold text-xs px-3.5 py-2 rounded flex items-center space-x-1.5 shadow-sm"
+                  >
+                    <i className="fa-solid fa-plus text-xs"></i>
+                    <span>Create Activity</span>
+                  </button>
+                </div>
+
+                {/* White Container Card */}
+                <div className="bg-white rounded border border-[#dddbda] shadow-sm">
+
+                  {/* Search and Date Filter Row */}
+                  <div className="p-3.5 flex items-center justify-between border-b border-[#e5e7eb] flex-wrap gap-2">
+                    <div className="relative w-80">
+                      <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                      <input
+                        type="text"
+                        placeholder="Search Activities"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs border border-[#d8dde6] rounded focus:border-[#0070d2] outline-none"
+                      />
+                    </div>
+
+                    {/* Date Range Selector */}
+                    <div className="flex items-center space-x-2">
+                      <button className="flex items-center space-x-2 px-3 py-1.5 border border-[#d8dde6] rounded text-xs text-gray-700 bg-white hover:bg-gray-50">
+                        <i className="fa-regular fa-calendar text-gray-500"></i>
+                        <span>9/1/2026 - 9/30/2026</span>
+                        <i className="fa-solid fa-caret-down text-[10px] text-gray-500 ml-1"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sub-tabs / Filter Chips */}
+                  <div className="px-4 border-b border-[#e5e7eb] flex items-center space-x-6 text-xs bg-white">
+                    <button
+                      onClick={() => setActivitySubTab("all")}
+                      className={`py-3 flex items-center space-x-1.5 transition-colors ${
+                        activitySubTab === "all" ? "tab-active" : "tab-inactive"
+                      }`}
+                    >
+                      <i className="fa-regular fa-clock"></i>
+                      <span>All Activities ({subtabCounts.all})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActivitySubTab("Calls")}
+                      className={`py-3 flex items-center space-x-1.5 transition-colors ${
+                        activitySubTab === "Calls" ? "tab-active" : "tab-inactive"
+                      }`}
+                    >
+                      <i className="fa-solid fa-phone text-[11px]"></i>
+                      <span>Calls ({subtabCounts.Calls})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActivitySubTab("Email")}
+                      className={`py-3 flex items-center space-x-1.5 transition-colors ${
+                        activitySubTab === "Email" ? "tab-active" : "tab-inactive"
+                      }`}
+                    >
+                      <i className="fa-regular fa-envelope"></i>
+                      <span>Emails ({subtabCounts.Email})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActivitySubTab("Meeting")}
+                      className={`py-3 flex items-center space-x-1.5 transition-colors ${
+                        activitySubTab === "Meeting" ? "tab-active" : "tab-inactive"
+                      }`}
+                    >
+                      <i className="fa-solid fa-user-group text-[11px]"></i>
+                      <span>Meetings ({subtabCounts.Meeting})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActivitySubTab("Task")}
+                      className={`py-3 flex items-center space-x-1.5 transition-colors ${
+                        activitySubTab === "Task" ? "tab-active" : "tab-inactive"
+                      }`}
+                    >
+                      <i className="fa-solid fa-list-check text-[11px]"></i>
+                      <span>Tasks ({subtabCounts.Task})</span>
+                    </button>
+                  </div>
+
+                  {/* Activities Table */}
+                  <div className="overflow-x-auto min-h-[320px]">
+                    <table className="w-full text-left freight-table border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="w-8 text-center"><i className="fa-solid fa-list-ul text-gray-400"></i></th>
+                          <th className="whitespace-nowrap">Title <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Activity Type <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Activity Date <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Activity Status <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Party <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Opportunity <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Activity Owner <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Contacts <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="whitespace-nowrap">Priority <span className="text-[10px] text-gray-400 font-normal">▽</span></th>
+                          <th className="text-right whitespace-nowrap">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredActivities.length === 0 ? (
+                          <tr>
+                            <td colSpan="11" className="text-center py-16 text-gray-400">
+                              <div className="flex flex-col items-center justify-center space-y-2">
+                                <i className="fa-regular fa-file-lines text-4xl text-gray-300"></i>
+                                <span className="text-sm font-medium text-gray-500">No records found</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredActivities.map((act) => {
+                            const actDate = dayjs(act.activityDate);
+                            const now = dayjs(currentTime);
+                            const isFuture = actDate.isAfter(now);
+                            const reminder = reminders.find((r) => r.activityId === act.id);
+
+                            return (
+                              <tr key={act.id} className="cursor-pointer group">
+                                <td className="text-center text-gray-400">
+                                  <i className="fa-solid fa-ellipsis-vertical"></i>
+                                </td>
+
+                                {/* Title */}
+                                <td className="font-semibold text-gray-900 hover:text-[#0070d2]" onClick={() => handleOpenEditDrawer(act)}>
+                                  {act.title}
+                                </td>
+
+                                {/* Activity Type Pill Badge */}
+                                <td className="whitespace-nowrap">
+                                  <span className={`inline-flex items-center space-x-1 whitespace-nowrap text-xs font-semibold px-2.5 py-0.5 rounded-full text-white ${
+                                    act.activityType === "Calls" || act.activityType === "Call" ? "bg-[#00897b]" :
+                                    act.activityType === "Email" ? "bg-[#00a896]" :
+                                    act.activityType === "Meeting" ? "bg-[#7b1fa2]" :
+                                    "bg-[#f57c00]"
+                                  }`}>
+                                    {act.activityType === "Calls" || act.activityType === "Call" ? <i className="fa-solid fa-phone text-[10px]"></i> : null}
+                                    {act.activityType === "Email" ? <i className="fa-regular fa-envelope text-[10px]"></i> : null}
+                                    {act.activityType === "Meeting" ? <i className="fa-solid fa-user-group text-[10px]"></i> : null}
+                                    {act.activityType === "Task" ? <i className="fa-solid fa-list-check text-[10px]"></i> : null}
+                                    <span>{act.activityType === "Calls" ? "Call" : act.activityType}</span>
+                                  </span>
+                                </td>
+
+                                {/* Activity Date */}
+                                <td className="text-xs text-gray-700 font-medium">
+                                  <div>{formatDateShort(act.activityDate)}</div>
+                                </td>
+
+                                {/* Status Pill Badge */}
+                                <td className="whitespace-nowrap">
+                                  <span className={`inline-flex items-center justify-center whitespace-nowrap text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                                    act.status === "New" ? "bg-[#3f51b5]" :
+                                    act.status === "In Progress" ? "bg-[#1e88e5]" :
+                                    act.status === "Completed" ? "bg-[#43a047]" :
+                                    "bg-[#e53935]"
+                                  }`}>
+                                    {act.status}
+                                  </span>
+                                </td>
+
+                                {/* Party */}
+                                <td className="text-xs text-gray-800">{act.party || "--"}</td>
+
+                                {/* Opportunity */}
+                                <td className="text-xs text-gray-800">{act.opportunity || "--"}</td>
+
+                                {/* Owner */}
+                                <td className="text-xs text-gray-700">{act.owner}</td>
+
+                                {/* Contacts */}
+                                <td className="text-xs text-gray-600">{act.contacts || "--"}</td>
+
+                                {/* Priority */}
+                                <td className="text-xs text-gray-700">{act.priority}</td>
+
+                                {/* Actions */}
+                                <td className="text-right whitespace-nowrap">
+                                  <button
+                                    onClick={() => handleOpenEditDrawer(act)}
+                                    title="Edit Activity"
+                                    className="text-gray-400 hover:text-blue-600 p-1 mr-1"
+                                  >
+                                    <i className="fa-solid fa-pen-to-square"></i>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteActivity(act.id)}
+                                    title="Delete Activity"
+                                    className="text-gray-400 hover:text-red-600 p-1"
+                                  >
+                                    <i className="fa-solid fa-trash-can"></i>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer */}
+                  <div className="px-4 py-3 border-t border-[#e5e7eb] flex items-center justify-between text-xs text-gray-600 bg-white">
+                    <div className="flex items-center space-x-2">
+                      <span>Showing</span>
+                      <select className="border border-gray-300 rounded px-2 py-1 text-xs">
+                        <option>25</option>
+                        <option>50</option>
+                        <option>100</option>
+                      </select>
+                      <span>of {filteredActivities.length} results</span>
+                    </div>
+
+                    <div className="flex items-center space-x-1">
+                      <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600 text-xs">
+                        &lt; Prev
+                      </button>
+                      <button className="px-2.5 py-1 bg-[#16325c] text-white rounded font-bold text-xs">
+                        1
+                      </button>
+                      <button className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-600 text-xs">
+                        Next &gt;
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* ==================================================== */}
+            {/* VIEW 2: SALES SETTINGS (With Activity Reminder Tab)  */}
+            {/* ==================================================== */}
+            {activeNav === "settings" && (
+              <div className="flex-1 overflow-y-auto p-5">
+
+                {/* Header */}
+                <h1 className="text-xl font-bold text-[#181818] mb-4">Settings</h1>
+
+                {/* Tabs Row */}
+                <div className="border-b border-[#dddbda] flex items-center space-x-8 mb-4 text-xs font-semibold">
+
+                  {/* Lead Stage Tab */}
+                  <button
+                    onClick={() => setSettingsTab("lead-stage")}
+                    className={`pb-2.5 transition-colors ${
+                      settingsTab === "lead-stage" ? "tab-active" : "tab-inactive"
+                    }`}
+                  >
+                    Lead Stage
+                  </button>
+
+                  {/* Opportunity Stage Tab */}
+                  <button
+                    onClick={() => setSettingsTab("opp-stage")}
+                    className={`pb-2.5 transition-colors ${
+                      settingsTab === "opp-stage" ? "tab-active" : "tab-inactive"
+                    }`}
+                  >
+                    Opportunity Stage
+                  </button>
+
+                  {/* Activity Status Tab */}
+                  <button
+                    onClick={() => setSettingsTab("activity-status")}
+                    className={`pb-2.5 transition-colors ${
+                      settingsTab === "activity-status" ? "tab-active" : "tab-inactive"
+                    }`}
+                  >
+                    Activity Status
+                  </button>
+
+                  {/* NEW TAB: Activity Reminder */}
+                  <button
+                    onClick={() => setSettingsTab("activity-reminder")}
+                    className={`pb-2.5 flex items-center space-x-1.5 transition-colors ${
+                      settingsTab === "activity-reminder" ? "tab-active" : "tab-inactive"
+                    }`}
+                  >
+                    <i className="fa-regular fa-bell text-blue-600"></i>
+                    <span>Activity Reminder</span>
+                  </button>
+                </div>
+
+                {/* Tab 1, 2, 3: Lead Stage, Opp Stage, Activity Status (Static replicas) */}
+                {settingsTab !== "activity-reminder" && (
+                  <div className="bg-white rounded border border-[#dddbda] shadow-sm p-4 text-xs">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="relative w-72">
+                        <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                        <input
+                          type="text"
+                          placeholder="Search Settings"
+                          className="w-full pl-8 pr-3 py-1.5 text-xs border border-[#d8dde6] rounded"
+                        />
+                      </div>
+                      <button className="btn-freight-primary text-xs font-semibold px-3 py-1.5 rounded">
+                        + Create Entry
+                      </button>
+                    </div>
+                    <div className="p-8 text-center text-gray-400">
+                      Standard {settingsTab.replace("-", " ")} configuration table.
+                      <div className="mt-2">
+                        <button
+                          onClick={() => setSettingsTab("activity-reminder")}
+                          className="text-blue-600 font-semibold underline"
+                        >
+                          Switch to Activity Reminder Settings Tab
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 4: ACTIVITY REMINDER SETTINGS (Core Requirement) */}
+                {settingsTab === "activity-reminder" && (
+                  <div className="bg-white rounded border border-[#dddbda] shadow-sm">
+
+                    {/* Filter and Action Header */}
+                    <div className="p-3.5 flex items-center justify-between border-b border-[#e5e7eb]">
+                      <div className="relative w-80">
+                        <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                        <input
+                          type="text"
+                          placeholder="Search Activity Reminders"
+                          className="w-full pl-8 pr-3 py-1.5 text-xs border border-[#d8dde6] rounded focus:border-[#0070d2] outline-none"
+                        />
+                      </div>
+
+                      <div className="text-xs text-gray-500 italic">
+                        <i className="fa-solid fa-circle-info text-blue-500 mr-1"></i>
+                        Defines system default reminder duration per activity type for future activities.
+                      </div>
+                    </div>
+
+                    {/* Settings Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left freight-table border-collapse">
+                        <thead>
+                          <tr>
+                            <th className="w-8 text-center"><i className="fa-solid fa-grip-vertical text-gray-400"></i></th>
+                            <th className="w-10 text-center"><i className="fa-solid fa-ellipsis-vertical text-gray-400"></i></th>
+                            <th>Activity Type ▽</th>
+                            <th>Default Reminder ▽</th>
+                            <th>Status ▽</th>
+                            <th>Created By ▽</th>
+                            <th>Last Modified ▽</th>
+                            <th className="text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {settings.map((item, idx) => (
+                            <tr key={item.id} className="hover:bg-slate-50">
+                              <td className="text-center text-gray-300">
+                                <i className="fa-solid fa-grip-vertical text-xs"></i>
+                              </td>
+                              <td className="text-center text-gray-400">
+                                <i className="fa-solid fa-ellipsis-vertical text-xs"></i>
+                              </td>
+
+                              {/* Activity Type */}
+                              <td className="font-semibold text-gray-900">
+                                <div className="flex items-center space-x-2">
+                                  {item.activityType === "Calls" && <i className="fa-solid fa-phone text-blue-600 text-xs"></i>}
+                                  {item.activityType === "Email" && <i className="fa-regular fa-envelope text-emerald-600 text-xs"></i>}
+                                  {item.activityType === "Meeting" && <i className="fa-solid fa-user-group text-purple-600 text-xs"></i>}
+                                  {item.activityType === "Task" && <i className="fa-solid fa-list-check text-amber-600 text-xs"></i>}
+                                  <span>{item.activityType}</span>
+                                </div>
+                              </td>
+
+                              {/* Default Reminder Dropdown / Display */}
+                              <td>
+                                {editingSetting === item.id ? (
+                                  <select
+                                    defaultValue={item.durationMinutes}
+                                    id={`select-dur-${item.id}`}
+                                    className="freight-select text-xs py-1 w-44 font-semibold text-blue-900 border-blue-400 focus:border-blue-600"
+                                  >
+                                    {REMINDER_DURATION_OPTIONS.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded text-xs inline-block">
+                                    {item.durationMinutes} minutes
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Status */}
+                              <td>
+                                <span className="bg-[#4bca81] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                                  {item.status}
+                                </span>
+                              </td>
+
+                              {/* Created By */}
+                              <td className="text-xs text-gray-600">{item.modifiedBy}</td>
+
+                              {/* Last Modified */}
+                              <td className="text-xs text-gray-600">{item.lastModified}</td>
+
+                              {/* Action: Edit Icon toggles to Save Icon */}
+                              <td className="text-right whitespace-nowrap">
+                                {editingSetting === item.id ? (
+                                  <div className="flex items-center justify-end space-x-1.5">
+                                    <button
+                                      onClick={() => {
+                                        const val = document.getElementById(`select-dur-${item.id}`).value;
+                                        handleSaveSetting(item.id, val);
+                                      }}
+                                      title="Save Default Reminder Setting"
+                                      className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer shadow-xs"
+                                    >
+                                      <i className="fa-solid fa-floppy-disk text-xs"></i>
+                                      <span>Save</span>
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingSetting(null)}
+                                      title="Cancel"
+                                      className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors cursor-pointer"
+                                    >
+                                      <i className="fa-solid fa-xmark text-xs"></i>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setEditingSetting(item.id)}
+                                    title="Edit Default Reminder Setting"
+                                    className="p-1.5 text-gray-500 hover:text-[#0070d2] hover:bg-blue-50 rounded transition-colors cursor-pointer text-sm"
+                                  >
+                                    <i className="fa-solid fa-pen-to-square"></i>
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Info footer */}
+                    <div className="p-4 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex items-center justify-between">
+                      <div>
+                        Each activity type has exactly <strong>one default reminder duration</strong>. Modifying a setting affects newly created activities.
+                      </div>
+                      <div className="text-gray-500">
+                        Total Configured Types: <strong>{settings.length}</strong>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Terms of Service Footer */}
+            <footer className="absolute bottom-1 right-4 text-[11px] text-[#0070d2] pointer-events-none">
+              Terms of Service (1.0.17.0)
+            </footer>
+
+            {/* ==================================================== */}
+            {/* DRAWER: ADD / EDIT ACTIVITY (Matching Screenshots)   */}
+            {/* ==================================================== */}
+            {isDrawerOpen && (
+              <div className="fixed inset-0 z-50 flex justify-end">
+
+                {/* Dark Backdrop Overlay */}
+                <div
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="fixed inset-0 bg-black/40 backdrop-blur-none transition-opacity"
+                ></div>
+
+                {/* Slide-in Drawer Container */}
+                <div className="w-[620px] max-w-full bg-white h-full shadow-2xl z-50 flex flex-col drawer-slide-in relative border-l border-gray-200">
+
+                  {/* Drawer Header */}
+                  <div className="px-6 py-4 border-b border-[#e5e7eb] flex items-center justify-between bg-white flex-shrink-0">
+                    <h2 className="text-base font-bold text-[#181818]">
+                      {editingActivity ? "Edit Activity" : "Add New Activity"}
+                    </h2>
+                    <button
+                      onClick={() => setIsDrawerOpen(false)}
+                      className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+
+                  {/* Drawer Form Body (Scrollable) */}
+                  <form onSubmit={handleSaveActivity} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+                    {/* Activity Type Segmented Selector */}
+                    <div>
+                      <label className="freight-label">
+                        Activity Type<span className="required-star">*</span>
+                      </label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { key: "Calls", label: "Calls", icon: "fa-phone" },
+                          { key: "Email", label: "Email", icon: "fa-envelope" },
+                          { key: "Meeting", label: "Meeting", icon: "fa-user-group" },
+                          { key: "Task", label: "Task", icon: "fa-list-check" }
+                        ].map((t) => (
+                          <button
+                            type="button"
+                            key={t.key}
+                            onClick={() => handleTypeChange(t.key)}
+                            className={`py-2 px-3 rounded text-xs flex items-center justify-center space-x-2 transition-all ${
+                              formData.activityType === t.key ? "type-btn-active" : "type-btn-inactive"
+                            }`}
+                          >
+                            <i className={`fa-solid ${t.icon} text-xs`}></i>
+                            <span>{t.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Title Field */}
+                    <div>
+                      <label className="freight-label">
+                        Title<span className="required-star">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter activity title"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        required
+                        className="freight-input"
+                      />
+                    </div>
+
+                    {/* Row: Party & Opportunity */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="freight-label">
+                          Party<span className="required-star">*</span>
+                        </label>
+                        <select
+                          value={formData.party}
+                          onChange={(e) => setFormData({ ...formData, party: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Select Party or Lead">Select Party or Lead</option>
+                          <option value="Maersk Line India Pvt Ltd">Maersk Line India Pvt Ltd</option>
+                          <option value="DHL Global Forwarding">DHL Global Forwarding</option>
+                          <option value="Hapag-Lloyd AG">Hapag-Lloyd AG</option>
+                          <option value="CMA CGM Group">CMA CGM Group</option>
+                          <option value="Apex Maritime Services">Apex Maritime Services</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="freight-label">Opportunity</label>
+                        <select
+                          value={formData.opportunity}
+                          onChange={(e) => setFormData({ ...formData, opportunity: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Select Opportunity">Select Opportunity</option>
+                          <option value="Ocean Freight Contract 2026">Ocean Freight Contract 2026</option>
+                          <option value="Air Charter - Pharma Batch">Air Charter - Pharma Batch</option>
+                          <option value="Container Booking">Container Booking</option>
+                          <option value="Annual SLA Agreement">Annual SLA Agreement</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Contacts */}
+                    <div>
+                      <label className="freight-label">Contacts</label>
+                      <select
+                        value={formData.contacts}
+                        onChange={(e) => setFormData({ ...formData, contacts: e.target.value })}
+                        className="freight-select"
+                      >
+                        <option value="Select Contacts">Select Contacts</option>
+                        <option value="Anita Desai">Anita Desai</option>
+                        <option value="Amit Shah">Amit Shah</option>
+                        <option value="Pooja Sharma">Pooja Sharma</option>
+                        <option value="Sanjay Patel">Sanjay Patel</option>
+                        <option value="Rajesh Kumar">Rajesh Kumar</option>
+                        <option value="Klaus Weber">Klaus Weber</option>
+                        <option value="Priya Nair">Priya Nair</option>
+                        <option value="Rohan Mehta">Rohan Mehta</option>
+                      </select>
+                    </div>
+
+                    {/* Row: Date and Time & Duration */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="freight-label">
+                          Date and Time<span className="required-star">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="datetime-local"
+                            value={formData.activityDate ? formData.activityDate.slice(0, 16) : ""}
+                            onChange={(e) => setFormData({ ...formData, activityDate: e.target.value })}
+                            required
+                            className="freight-input pr-8 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="freight-label">Duration</label>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1 flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="24"
+                              placeholder="HH"
+                              value={formData.durationHours}
+                              onChange={(e) => setFormData({ ...formData, durationHours: parseInt(e.target.value) || 0 })}
+                              className="freight-input text-center py-1.5"
+                            />
+                            <span className="text-xs text-gray-500 font-semibold">h</span>
+                          </div>
+
+                          <div className="flex items-center space-x-1 flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="59"
+                              step="5"
+                              placeholder="MM"
+                              value={formData.durationMinutes}
+                              onChange={(e) => setFormData({ ...formData, durationMinutes: parseInt(e.target.value) || 0 })}
+                              className="freight-input text-center py-1.5"
+                            />
+                            <span className="text-xs text-gray-500 font-semibold">m</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ==================================================== */}
+                    {/* INTEGRATED FIELD: REMINDER DURATION DROPDOWN         */}
+                    {/* Native Freightoscope form field layout               */}
+                    {/* ==================================================== */}
+                    <div>
+                      <label className="freight-label">Reminder</label>
+
+                      <select
+                        value={formData.reminderDurationMinutes}
+                        onChange={(e) => handleReminderDurationChange(e.target.value)}
+                        disabled={isPastActivityDate}
+                        className={`freight-select ${
+                          isPastActivityDate 
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" 
+                            : ""
+                        }`}
+                      >
+                        {REMINDER_DURATION_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Row: Direction & Purpose */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="freight-label">Direction</label>
+                        <select
+                          value={formData.direction}
+                          onChange={(e) => setFormData({ ...formData, direction: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Select Call Direction">Select Call Direction</option>
+                          <option value="Inbound">Inbound</option>
+                          <option value="Outbound">Outbound</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="freight-label">Purpose</label>
+                        <select
+                          value={formData.purpose}
+                          onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Select Call Purpose">Select Call Purpose</option>
+                          <option value="Sales Pitch">Sales Pitch</option>
+                          <option value="Contract Review">Contract Review</option>
+                          <option value="Follow Up">Follow Up</option>
+                          <option value="Support">Support</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Row: Outcome & Status */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="freight-label">Outcome</label>
+                        <select
+                          value={formData.outcome}
+                          onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Select Call Outcome">Select Call Outcome</option>
+                          <option value="Interested">Interested</option>
+                          <option value="Meeting Fixed">Meeting Fixed</option>
+                          <option value="Not Interested">Not Interested</option>
+                          <option value="Pending">Pending</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="freight-label">
+                          Status<span className="required-star">*</span>
+                        </label>
+                        <select
+                          value={formData.status}
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                          required
+                          className="freight-select"
+                        >
+                          <option value="New">New</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Completed">Completed</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Row: Priority & Owner */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="freight-label">Priority</label>
+                        <select
+                          value={formData.priority}
+                          onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="freight-label">Owner</label>
+                        <select
+                          value={formData.owner}
+                          onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                          className="freight-select"
+                        >
+                          <option value="Shreshth Dubey">Shreshth Dubey</option>
+                          <option value="Vikram Seth">Vikram Seth</option>
+                          <option value="Pooja Sharma">Pooja Sharma</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Other Team Members */}
+                    <div>
+                      <label className="freight-label">Other Team Members</label>
+                      <select className="freight-select">
+                        <option value="">Select Team Members</option>
+                        <option value="Vikram Seth">Vikram Seth</option>
+                        <option value="Pooja Sharma">Pooja Sharma</option>
+                        <option value="Amit Roy">Amit Roy</option>
+                      </select>
+                    </div>
+
+                    {/* Notes Textarea */}
+                    <div>
+                      <label className="freight-label">Notes</label>
+                      <textarea
+                        rows="3"
+                        placeholder="Enter notes"
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        className="freight-input resize-y"
+                      ></textarea>
+                    </div>
+
+                  </form>
+
+                  {/* Drawer Fixed Footer */}
+                  <div className="px-6 py-3.5 border-t border-[#e5e7eb] bg-white flex items-center justify-end space-x-3 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsDrawerOpen(false)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveActivity}
+                      className="btn-freight-primary px-5 py-2 text-xs font-semibold rounded shadow-sm"
+                    >
+                      Save
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* ==================================================== */}
+            {/* ON-SCREEN REAL-TIME REMINDER POP-UP MODAL            */}
+            {/* Appears in center of screen no matter what screen user is on */}
+            {/* ==================================================== */}
+            {activeAlertModalReminder && (() => {
+              const targetActivity = activities.find(a => a.id === activeAlertModalReminder.activityId);
+
+              const getActivityIcon = (type) => {
+                switch ((type || "").toLowerCase()) {
+                  case "calls": return "fa-solid fa-phone";
+                  case "meeting": return "fa-solid fa-calendar-check";
+                  case "email": return "fa-solid fa-envelope";
+                  case "task": return "fa-solid fa-list-check";
+                  default: return "fa-solid fa-bell";
+                }
+              };
+
+              const contactInfo = activeAlertModalReminder.contacts || (targetActivity && targetActivity.contacts) || "";
+
+              return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                  {/* Dark Backdrop */}
+                  <div 
+                    className="fixed inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-200" 
+                    onClick={() => handleDismissReminder(activeAlertModalReminder.id)}
+                  ></div>
+
+                  {/* Modal Card */}
+                  <div className="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-scale-in z-[210]">
+                    
+                    {/* Header: Freightoscope Navy Blue (#16325c) */}
+                    <div className="bg-[#16325c] px-5 py-3.5 flex items-center justify-between text-white shadow-sm">
+                      <div className="flex items-center space-x-2.5">
+                        <i className={`${getActivityIcon(activeAlertModalReminder.activityType)} text-amber-400 text-base`}></i>
+                        <h3 className="font-bold text-sm text-white tracking-wide">Activity Reminder</h3>
+                      </div>
+                      <button
+                        onClick={() => handleDismissReminder(activeAlertModalReminder.id)}
+                        className="text-white/70 hover:text-white text-lg font-light transition-colors cursor-pointer p-1"
+                        title="Dismiss Reminder"
+                      >
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    {/* Body Content */}
+                    <div className="p-5 space-y-3.5">
+                      {/* Subject / Title */}
+                      <div>
+                        <h2 className="text-base font-bold text-gray-900 leading-snug">
+                          {activeAlertModalReminder.subject}
+                        </h2>
+                      </div>
+
+                      {/* Key Details Container */}
+                      <div className="bg-slate-50 border border-slate-200/90 rounded-lg p-3.5 space-y-2.5 text-xs text-gray-700">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                          <div className="flex items-center space-x-2 text-gray-600 font-medium">
+                            <i className="fa-regular fa-clock text-[#0070d2] text-xs"></i>
+                            <span>Scheduled Time:</span>
+                          </div>
+                          <span className="font-bold text-[#16325c]">
+                            {formatDateTime(activeAlertModalReminder.activityDate)}
+                          </span>
+                        </div>
+
+                        {activeAlertModalReminder.party && (
+                          <div className="flex items-start justify-between space-x-2">
+                            <div className="flex items-center space-x-2 text-gray-600 font-medium min-w-[90px]">
+                              <i className="fa-solid fa-building text-[#0070d2] text-xs"></i>
+                              <span>Party:</span>
+                            </div>
+                            <span className="font-semibold text-gray-900 text-right">{activeAlertModalReminder.party}</span>
+                          </div>
+                        )}
+
+                        {activeAlertModalReminder.opportunity && (
+                          <div className="flex items-start justify-between space-x-2">
+                            <div className="flex items-center space-x-2 text-gray-600 font-medium min-w-[90px]">
+                              <i className="fa-solid fa-briefcase text-[#0070d2] text-xs"></i>
+                              <span>Opportunity:</span>
+                            </div>
+                            <span className="font-semibold text-gray-900 text-right">{activeAlertModalReminder.opportunity}</span>
+                          </div>
+                        )}
+
+                        {contactInfo && (
+                          <div className="flex items-start justify-between space-x-2">
+                            <div className="flex items-center space-x-2 text-gray-600 font-medium min-w-[90px]">
+                              <i className="fa-solid fa-address-book text-[#0070d2] text-xs"></i>
+                              <span>Contact:</span>
+                            </div>
+                            <span className="font-semibold text-gray-900 text-right">{contactInfo}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons Row */}
+                      <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                        {/* View Activity */}
+                        <button
+                          onClick={() => {
+                            if (targetActivity) {
+                              handleOpenEditDrawer(targetActivity);
+                            } else {
+                              showToast("Activity details not found.");
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                          title="Open Activity Details"
+                        >
+                          <i className="fa-solid fa-arrow-up-right-from-square text-[#0070d2]"></i>
+                          <span>View Activity</span>
+                        </button>
+
+                        {/* Snooze & Dismiss */}
+                        <div className="flex items-center space-x-1.5">
+                          <button
+                            onClick={() => handleSnoozeReminder(activeAlertModalReminder.id, 5)}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer"
+                          >
+                            <i className="fa-solid fa-clock-rotate-left text-amber-700"></i>
+                            <span>Snooze (5m)</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleSnoozeReminder(activeAlertModalReminder.id, 15)}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer"
+                          >
+                            <i className="fa-solid fa-clock-rotate-left text-amber-700"></i>
+                            <span>Snooze (15m)</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDismissReminder(activeAlertModalReminder.id)}
+                            className="px-3 py-1.5 bg-[#16325c] hover:bg-[#0f2341] text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center space-x-1 cursor-pointer"
+                          >
+                            <i className="fa-solid fa-check"></i>
+                            <span>Dismiss</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ==================================================== */}
+            {/* NOTIFICATIONS POPOVER (EMERGES FROM BELL ICON AT BOTTOM-LEFT) */}
+            {/* Matches exact Freightoscope Notifications design     */}
+            {/* ==================================================== */}
+            {isNotificationOpen && (
+              <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setIsNotificationOpen(false)}>
+                {/* Subtle Backdrop */}
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px]"></div>
+
+                {/* Notifications Drawer / Popover Panel - emerging directly above the bottom-left bell icon */}
+                <div
+                  className="fixed bottom-[44px] left-[130px] w-[560px] max-w-[calc(100vw-140px)] h-[640px] max-h-[calc(100vh-55px)] bg-white rounded-t-xl rounded-r-xl shadow-2xl z-[100] border border-gray-300 flex flex-col drawer-slide-in overflow-hidden"
+                  style={{ transformOrigin: 'bottom left' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+
+                  {/* Header: Exact Freightoscope Navy Blue */}
+                  <div className="bg-[#16325c] px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0">
+                    <h2 className="text-xl font-bold text-white tracking-wide">Notifications</h2>
+                    <button
+                      onClick={() => setIsNotificationOpen(false)}
+                      className="text-white hover:text-gray-200 text-xl font-light transition-colors"
+                      title="Close Notifications"
+                    >
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+
+                  {/* Sub-Header: Filter Tabs & Pill Action Buttons */}
+                  <div className="px-6 pt-3 pb-2 border-b border-gray-200 flex items-center justify-between bg-white text-sm flex-shrink-0">
+                    {/* Left Sub-Tabs */}
+                    <div className="flex items-center space-x-6">
+                      <button
+                        onClick={() => setNotifTab("all")}
+                        className={`pb-2 transition-colors ${
+                          notifTab === "all" ? "text-[#16325c] font-bold border-b-2 border-[#16325c]" : "text-gray-600 hover:text-gray-900 font-medium"
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setNotifTab("read")}
+                        className={`pb-2 transition-colors ${
+                          notifTab === "read" ? "text-[#16325c] font-bold border-b-2 border-[#16325c]" : "text-gray-600 hover:text-gray-900 font-medium"
+                        }`}
+                      >
+                        Read
+                      </button>
+                      <button
+                        onClick={() => setNotifTab("unread")}
+                        className={`pb-2 transition-colors ${
+                          notifTab === "unread" ? "text-[#16325c] font-bold border-b-2 border-[#16325c]" : "text-gray-600 hover:text-gray-900 font-medium"
+                        }`}
+                      >
+                        Unread
+                      </button>
+                    </div>
+
+                    {/* Right Pill Buttons */}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleDismissAllReminders}
+                        className="border border-red-400 text-red-500 hover:bg-red-50 px-3.5 py-1 rounded-full text-xs font-medium transition-colors"
+                      >
+                        Dismiss All
+                      </button>
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="border border-blue-400 text-blue-600 hover:bg-blue-50 px-3.5 py-1 rounded-full text-xs font-medium transition-colors"
+                      >
+                        Mark All Read
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search Input Bar */}
+                  <div className="px-6 py-3 bg-white flex-shrink-0">
+                    <div className="relative">
+                      <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-gray-400 text-sm"></i>
+                      <input
+                        type="text"
+                        placeholder="Search here..."
+                        value={notifSearchQuery}
+                        onChange={(e) => setNotifSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 shadow-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notification Items List */}
+                  <div className="flex-1 overflow-y-auto px-6 py-2 space-y-3 bg-white">
+                    {filteredNotificationReminders.length === 0 ? (
+                      <div className="text-center py-16 text-gray-400">
+                        <i className="fa-regular fa-bell-slash text-4xl mb-3 text-gray-300"></i>
+                        <p className="text-sm font-medium text-gray-500">No notifications found</p>
+                      </div>
+                    ) : (
+                      filteredNotificationReminders.map((rem) => (
+                        <div
+                          key={rem.id}
+                          className="bg-[#e9ecef] hover:bg-[#e2e6ea] border border-gray-200/80 rounded-xl p-3.5 relative transition-all"
+                        >
+                          <div className="flex items-start space-x-3.5">
+                            {/* User Avatar Circle */}
+                            <div className="w-11 h-11 rounded-full bg-[#d0e1f9] flex-shrink-0 flex items-center justify-center text-[#5586c5] shadow-xs">
+                              <i className="fa-solid fa-user text-lg"></i>
+                            </div>
+
+                            {/* Main Body */}
+                            <div className="flex-1 pr-24">
+                              <h4 className="font-bold text-sm text-gray-900 leading-snug mb-1">
+                                {rem.subject}
+                              </h4>
+                              
+                              <div className="text-xs text-gray-700 font-medium mb-0.5">
+                                {formatDateShort(rem.activityDate)}
+                              </div>
+
+                              <div className="text-xs text-gray-500">
+                                From: {rem.owner || "Shreshth Dubey"} {rem.party ? `• Party: ${rem.party}` : ""}
+                              </div>
+                            </div>
+
+                            {/* Top Right: Clock Timestamp & Trash Can Icon */}
+                            <div className="absolute top-3.5 right-4 text-right flex flex-col items-end space-y-2">
+                              <span className="text-[11px] text-gray-600 font-medium flex items-center space-x-1">
+                                <i className="fa-regular fa-clock text-[11px] text-gray-500"></i>
+                                <span>{dayjs(rem.reminderDate).format("ddd MMM D YYYY HH:mm")}</span>
+                              </span>
+
+                              <button
+                                onClick={() => handleDismissReminder(rem.id)}
+                                title="Delete Notification"
+                                className="text-red-500 hover:text-red-700 p-0.5 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash-can text-sm"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Panel Footer */}
+                  <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
+                    <div className="text-xs text-gray-600">
+                      <span className="font-semibold text-gray-900">{reminders.filter((r) => !r.isDismissed).length}</span> Total Notifications
+                    </div>
+                    <button
+                      onClick={() => setIsNotificationOpen(false)}
+                      className="px-4 py-1.5 bg-[#16325c] hover:bg-[#0f2341] text-white rounded text-xs font-semibold transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* Terms of Service Footer */}
+            <footer className="absolute bottom-1 right-4 text-[11px] text-[#0070d2] pointer-events-none">
+              Terms of Service (1.0.17.0)
+            </footer>
+
+            {/* ==================================================== */}
+            {/* MINIMAL FLOATING DEV TIME TOOL (DISCREET BOTTOM-RIGHT PILL) */}
+            {/* Minimal dev/wa tool style, not taking main UI feature space */}
+            {/* ==================================================== */}
+            <div className="fixed bottom-3 right-5 z-40">
+              {!isDevToolOpen ? (
+                <button
+                  onClick={() => setIsDevToolOpen(true)}
+                  className="bg-[#16325c] hover:bg-[#0f2341] text-white border border-[#0070d2]/50 px-3.5 py-1.5 rounded-full shadow-lg text-xs font-semibold flex items-center space-x-2 transition-all hover:scale-105 cursor-pointer"
+                  title="Click to adjust simulated time"
+                >
+                  <i className="fa-regular fa-clock text-amber-300 text-sm"></i>
+                  <span className="font-mono text-xs font-bold text-white">
+                    {dayjs(currentTime).format("h:mm A")}
+                  </span>
+                  {useCustomTime && (
+                    <span className="bg-amber-500 text-black text-[9px] font-extrabold px-1.5 py-0.2 rounded-full uppercase font-sans">
+                      SIM
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <div className="bg-slate-900/95 text-slate-200 border border-slate-700 rounded-xl shadow-2xl p-3.5 text-xs font-sans w-[340px] backdrop-blur text-slate-300 space-y-2.5 drawer-slide-in">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center space-x-2">
+                      <i className="fa-regular fa-clock text-amber-400 text-xs"></i>
+                      <span className="font-bold text-white font-mono uppercase tracking-wider text-[11px]">Customize Timing</span>
+                      {useCustomTime ? (
+                        <span className="bg-amber-500 text-black font-bold text-[9px] px-1.5 py-0.5 rounded">CUSTOM</span>
+                      ) : (
+                        <span className="bg-emerald-600 text-white font-bold text-[9px] px-1.5 py-0.5 rounded">REAL-TIME</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setIsDevToolOpen(false)}
+                      className="text-slate-400 hover:text-white text-xs px-1"
+                      title="Minimize"
+                    >
+                      <i className="fa-solid fa-minus"></i>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between space-x-2">
+                    <span className="text-[11px] text-slate-400 font-medium">Clock Mode:</span>
+                    <div className="flex items-center space-x-1 bg-slate-800 p-0.5 rounded border border-slate-700">
+                      <button
+                        onClick={handleResetRealTime}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                          !useCustomTime ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Real Time
+                      </button>
+                      <button
+                        onClick={() => setUseCustomTime(true)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                          useCustomTime ? "bg-amber-500 text-slate-950 font-bold" : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Simulated
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="datetime-local"
+                        value={customTime}
+                        onChange={(e) => {
+                          setCustomTime(e.target.value);
+                        }}
+                        className="bg-slate-800 border border-slate-700 text-white text-xs rounded px-2 py-1 flex-1 font-mono focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-1 justify-between pt-0.5">
+                      <span className="text-[10px] text-slate-400 font-mono">Fast-Forward:</span>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => handleFastForward(5)}
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-mono text-[10px] px-2 py-0.5 rounded cursor-pointer"
+                        >
+                          +5m
+                        </button>
+                        <button
+                          onClick={() => handleFastForward(15)}
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-mono text-[10px] px-2 py-0.5 rounded cursor-pointer"
+                        >
+                          +15m
+                        </button>
+                        <button
+                          onClick={() => handleFastForward(60)}
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-mono text-[10px] px-2 py-0.5 rounded cursor-pointer"
+                        >
+                          +1h
+                        </button>
+                        <button
+                          onClick={() => handleFastForward(1440)}
+                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-mono text-[10px] px-2 py-0.5 rounded cursor-pointer"
+                        >
+                          +1d
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Explicit Apply Action Button */}
+                  <div className="pt-2 border-t border-slate-800">
+                    <button
+                      onClick={handleApplyCustomTime}
+                      className="w-full py-1.5 bg-[#0070d2] hover:bg-[#005fb3] text-white font-bold rounded text-xs transition-colors flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm"
+                    >
+                      <i className="fa-solid fa-check text-xs"></i>
+                      <span>Apply</span>
+                    </button>
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 font-mono pt-1 flex items-center justify-between">
+                    <span>Active Clock: <strong className="text-amber-300">{dayjs(currentTime).format("D MMM, h:mm A")}</strong></span>
+                    {useCustomTime && (
+                      <button onClick={handleResetRealTime} className="text-amber-400 hover:underline text-[10px] cursor-pointer">
+                        Reset to Now
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </main>
+        </div>
+      );
+    }
+
+    // Mount Application
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<FreightoscopeApp />);
+  </script>
+</body>
+</html>
