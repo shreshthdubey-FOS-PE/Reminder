@@ -17,9 +17,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isSameOrAfter.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isSameOrBefore.min.js"></script>
   <script>
-    dayjs.extend(window.dayjs_plugin_relativeTime);
-    dayjs.extend(window.dayjs_plugin_isSameOrAfter);
-    dayjs.extend(window.dayjs_plugin_isSameOrBefore);
+    if (window.dayjs) {
+      if (window.dayjs_plugin_relativeTime) dayjs.extend(window.dayjs_plugin_relativeTime);
+      if (window.dayjs_plugin_isSameOrAfter) dayjs.extend(window.dayjs_plugin_isSameOrAfter);
+      if (window.dayjs_plugin_isSameOrBefore) dayjs.extend(window.dayjs_plugin_isSameOrBefore);
+    }
   </script>
 
   <!-- React 18 & ReactDOM -->
@@ -194,7 +196,32 @@
   </style>
 </head>
 <body class="h-screen overflow-hidden flex flex-col select-none">
-  <div id="root" class="h-full flex flex-col"></div>
+  <div id="root" class="h-full flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
+    <div class="text-center p-8 max-w-md bg-slate-800 rounded-xl shadow-2xl border border-slate-700">
+      <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <h2 class="text-lg font-bold mb-1 text-slate-100">Loading Freightoscope Prototype...</h2>
+      <p class="text-xs text-slate-400 mb-4">
+        Initializing interactive components and activity reminder engine.
+      </p>
+      <div id="fallback-help" class="hidden text-left bg-slate-900/80 p-4 rounded-lg border border-slate-700 text-xs space-y-2">
+        <p class="text-amber-400 font-semibold flex items-center">
+          <i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Taking longer than expected?
+        </p>
+        <p class="text-slate-300 text-[11px] leading-relaxed">
+          If this screen persists, an internet connection is required to load CDN dependencies (React, Dayjs, Tailwind).
+        </p>
+        <button onclick="localStorage.clear(); location.reload();" class="mt-3 w-full py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded font-medium text-xs transition-colors">
+          Clear Local Storage & Reload
+        </button>
+      </div>
+    </div>
+    <script>
+      setTimeout(function() {
+        var help = document.getElementById('fallback-help');
+        if (help) help.classList.remove('hidden');
+      }, 3000);
+    </script>
+  </div>
 
   <!-- React Application Logic -->
   <script type="text/babel">
@@ -207,7 +234,8 @@
       { value: 15, label: "15 minutes before" },
       { value: 30, label: "30 minutes before" },
       { value: 50, label: "50 minutes before" },
-      { value: 60, label: "1 hour before" }
+      { value: 60, label: "1 hour before" },
+      { value: "custom", label: "Custom date & time" }
     ];
 
     // Initial Default Settings per Activity Type
@@ -442,16 +470,24 @@
 
       // Settings State
       const [settings, setSettings] = useState(() => {
-        const saved = localStorage.getItem("fs_reminder_settings");
-        return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+        try {
+          const saved = localStorage.getItem("fs_reminder_settings");
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch (err) {
+          console.warn("Could not load settings from localStorage:", err);
+        }
+        return INITIAL_SETTINGS;
       });
 
       // Helper to dynamically adjust activity dates to the current day if saved data is from a past/different date
       const autoUpdateActivitiesToCurrentDate = (items) => {
-        if (!items || items.length === 0) return getInitialActivities();
+        if (!items || !Array.isArray(items) || items.length === 0) return getInitialActivities();
         
         const now = dayjs();
-        const firstActDate = dayjs(items[0].activityDate);
+        const firstActDate = items[0] && items[0].activityDate ? dayjs(items[0].activityDate) : now;
         
         // If the saved data is from a previous calendar day, shift all activity dates to today's date
         if (!firstActDate.isSame(now, "day")) {
@@ -459,7 +495,7 @@
           return items.map((act) => {
             const originalDate = dayjs(act.activityDate);
             const shiftedDate = originalDate.add(diffDays, "day");
-            const isFuture = shiftedDate.isSameOrAfter(now);
+            const isFuture = typeof shiftedDate.isSameOrAfter === 'function' ? shiftedDate.isSameOrAfter(now) : shiftedDate.valueOf() >= now.valueOf();
             return {
               ...act,
               activityDate: shiftedDate.format("YYYY-MM-DDTHH:mm:ss"),
@@ -472,15 +508,21 @@
 
       // Activities State
       const [activities, setActivities] = useState(() => {
-        const saved = localStorage.getItem("fs_activities");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const cleaned = parsed.map((a) => ({
-            ...a,
-            contacts: a.contacts ? a.contacts.replace(/\s*\([^)]*\)/g, "") : a.contacts
-          }));
-          if (cleaned.length < 8) return getInitialActivities();
-          return autoUpdateActivitiesToCurrentDate(cleaned);
+        try {
+          const saved = localStorage.getItem("fs_activities");
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              const cleaned = parsed.map((a) => ({
+                ...a,
+                contacts: a.contacts ? String(a.contacts).replace(/\s*\([^)]*\)/g, "") : a.contacts
+              }));
+              if (cleaned.length < 8) return getInitialActivities();
+              return autoUpdateActivitiesToCurrentDate(cleaned);
+            }
+          }
+        } catch (err) {
+          console.warn("Could not load activities from localStorage:", err);
         }
         return getInitialActivities();
       });
@@ -572,8 +614,13 @@
           }
 
           const remId = `REM-${act.id}`;
-          const duration = act.reminderDurationMinutes || 15;
-          const defaultTriggerDate = actDate.subtract(duration, "minute");
+          let defaultTriggerDate;
+          const duration = typeof act.reminderDurationMinutes === "number" ? act.reminderDurationMinutes : 15;
+          if ((act.reminderDurationMinutes === "custom" || act.isCustomReminder) && act.customReminderDate) {
+            defaultTriggerDate = dayjs(act.customReminderDate);
+          } else {
+            defaultTriggerDate = actDate.subtract(duration, "minute");
+          }
 
           // Check Snooze & Dismiss state
           const snoozedUntilStr = snoozedReminders[remId];
@@ -602,7 +649,7 @@
             activityDate: act.activityDate,
             reminderDate: defaultTriggerDate.toISOString(),
             effectiveTriggerDate: effectiveTriggerDate.toISOString(),
-            durationMinutes: duration,
+            durationMinutes: act.reminderDurationMinutes === "custom" ? "custom" : duration,
             source: "Sales Activity",
             sourceNumber: "", // Prompt AC15: Source Number remains empty
             timezone: timezone,
@@ -745,6 +792,7 @@
         const defaultDur = getDefaultDurationForType(presetType);
         // Default activity time: 1 hour from current simulated time
         const defaultActTime = dayjs(currentTime).add(1, "hour").minute(0).second(0).format("YYYY-MM-DDTHH:mm:00");
+        const defaultCustomRemTime = dayjs(defaultActTime).subtract(defaultDur, "minute").format("YYYY-MM-DDTHH:mm");
 
         setEditingActivity(null);
         setFormData({
@@ -757,6 +805,7 @@
           durationHours: 0,
           durationMinutes: 30,
           reminderDurationMinutes: defaultDur,
+          customReminderDate: defaultCustomRemTime,
           isReminderUserOverridden: false,
           direction: presetType === "Calls" ? "Select Call Direction" : "Select Direction",
           purpose: presetType === "Calls" ? "Select Call Purpose" : "Select Purpose",
@@ -772,6 +821,10 @@
 
       // Open Drawer for Editing Activity
       const handleOpenEditDrawer = (activity) => {
+        const isCustom = activity.reminderDurationMinutes === "custom" || activity.isCustomReminder;
+        const customTimeVal = activity.customReminderDate || 
+          dayjs(activity.activityDate).subtract(typeof activity.reminderDurationMinutes === "number" ? activity.reminderDurationMinutes : 15, "minute").format("YYYY-MM-DDTHH:mm");
+
         setEditingActivity(activity);
         setFormData({
           activityType: activity.activityType,
@@ -782,7 +835,8 @@
           activityDate: activity.activityDate,
           durationHours: activity.durationHours || 0,
           durationMinutes: activity.durationMinutes || 15,
-          reminderDurationMinutes: activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType),
+          reminderDurationMinutes: isCustom ? "custom" : (activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType)),
+          customReminderDate: customTimeVal,
           isReminderUserOverridden: true,
           direction: activity.direction || "Select Direction",
           purpose: activity.purpose || "Select Purpose",
@@ -807,12 +861,17 @@
       };
 
       // When User explicitly changes Reminder dropdown in Drawer
-      const handleReminderDurationChange = (minutes) => {
-        setFormData((prev) => ({
-          ...prev,
-          reminderDurationMinutes: parseInt(minutes),
-          isReminderUserOverridden: true
-        }));
+      const handleReminderDurationChange = (val) => {
+        const isCustomVal = val === "custom";
+        setFormData((prev) => {
+          const defaultCustomRem = prev.customReminderDate || (prev.activityDate ? dayjs(prev.activityDate).subtract(15, "minute").format("YYYY-MM-DDTHH:mm") : "");
+          return {
+            ...prev,
+            reminderDurationMinutes: isCustomVal ? "custom" : parseInt(val),
+            customReminderDate: defaultCustomRem,
+            isReminderUserOverridden: true
+          };
+        });
       };
 
       // Save Activity
@@ -825,7 +884,16 @@
 
         const actDate = dayjs(formData.activityDate);
         const now = dayjs(currentTime);
-        const isFutureAtSave = actDate.isSameOrAfter(now);
+
+        let targetReminderDate;
+        if (formData.reminderDurationMinutes === "custom" && formData.customReminderDate) {
+          targetReminderDate = dayjs(formData.customReminderDate);
+        } else {
+          const dur = typeof formData.reminderDurationMinutes === "number" ? formData.reminderDurationMinutes : 15;
+          targetReminderDate = actDate.subtract(dur, "minute");
+        }
+
+        const isFutureAtSave = targetReminderDate.isSameOrAfter(now);
 
         const targetId = editingActivity ? editingActivity.id : `ACT-${Date.now().toString().slice(-4)}`;
         const remId = `REM-${targetId}`;
@@ -1884,6 +1952,18 @@
                           </option>
                         ))}
                       </select>
+
+                      {/* Minimal Compact Custom Reminder Date & Time Input */}
+                      {formData.reminderDurationMinutes === "custom" && !isPastActivityDate && (
+                        <div className="mt-2">
+                          <input
+                            type="datetime-local"
+                            value={formData.customReminderDate ? formData.customReminderDate.slice(0, 16) : ""}
+                            onChange={(e) => setFormData({ ...formData, customReminderDate: e.target.value, isReminderUserOverridden: true })}
+                            className="freight-input text-xs font-mono py-1.5 px-2.5 bg-white border-blue-300 focus:border-[#0070d2]"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Row: Direction & Purpose */}
@@ -2477,9 +2557,66 @@
       );
     }
 
-    // Mount Application
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<FreightoscopeApp />);
+    // React Error Boundary Component to prevent silent white screen crashes
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("React Error Boundary Caught An Error:", error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="h-screen w-screen flex items-center justify-center bg-slate-900 text-white p-6 font-sans select-text">
+              <div className="max-w-lg w-full bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-2xl text-center space-y-4">
+                <div className="w-12 h-12 bg-rose-500/20 text-rose-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                  <i className="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2 className="text-xl font-bold text-slate-100">Application Error Detected</h2>
+                <p className="text-xs text-slate-300 bg-slate-900/80 p-3 rounded border border-slate-700 font-mono text-left overflow-auto max-h-32">
+                  {this.state.error ? this.state.error.toString() : "An unexpected error occurred during rendering."}
+                </p>
+                <div className="pt-2 flex space-x-3 justify-center">
+                  <button
+                    onClick={() => { localStorage.clear(); window.location.reload(); }}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Clear Saved Data & Reload
+                  </button>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Reload Page
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // Mount Application safely
+    try {
+      const rootContainer = document.getElementById("root");
+      if (rootContainer) {
+        const root = ReactDOM.createRoot(rootContainer);
+        root.render(
+          <ErrorBoundary>
+            <FreightoscopeApp />
+          </ErrorBoundary>
+        );
+      }
+    } catch (err) {
+      console.error("Mount error:", err);
+    }
   </script>
 </body>
 </html>
