@@ -230,12 +230,13 @@
     // Standard Reminder Duration Options
     const REMINDER_DURATION_OPTIONS = [
       { value: "none", label: "No Reminder" },
-      { value: 5, label: "5 Mins before" },
-      { value: 10, label: "10 Mins before" },
-      { value: 15, label: "15 Mins before" },
-      { value: 30, label: "30 Mins before" },
-      { value: 60, label: "60 Mins before" },
-      { value: 1440, label: "1 Day before" },
+      { value: 5, label: "5 Minutes" },
+      { value: 10, label: "10 Minutes" },
+      { value: 15, label: "15 Minutes" },
+      { value: 30, label: "30 Minutes" },
+      { value: 60, label: "1 Hour" },
+      { value: 180, label: "3 Hours" },
+      { value: 1440, label: "1 Day" },
       { value: "custom", label: "Custom Date & Time" }
     ];
 
@@ -1707,7 +1708,7 @@
                               {/* Default Reminder Display */}
                               <td>
                                 <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded text-xs inline-block">
-                                  {REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(item.durationMinutes))?.label || (typeof item.durationMinutes === 'number' ? `${item.durationMinutes} Mins before` : item.durationMinutes)}
+                                  {REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(item.durationMinutes))?.label || (typeof item.durationMinutes === 'number' ? (item.durationMinutes >= 60 ? `${item.durationMinutes / 60} Hour${item.durationMinutes >= 120 ? 's' : ''}` : `${item.durationMinutes} Minutes`) : item.durationMinutes)}
                                 </span>
                               </td>
 
@@ -2116,7 +2117,7 @@
                     {/* ==================================================== */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="freight-label">Drop</label>
+                        <label className="freight-label">Remind before</label>
                         <select
                           value={formData.reminderDurationMinutes}
                           onChange={(e) => handleReminderDurationChange(e.target.value)}
@@ -2680,7 +2681,7 @@
                           </select>
                         ) : (
                           <div className="bg-[#f8fafc] border border-gray-300 rounded px-3 py-2 font-semibold text-blue-700">
-                            {REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(item.durationMinutes))?.label || (typeof item.durationMinutes === 'number' ? `${item.durationMinutes} Mins before` : item.durationMinutes)}
+                            {REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(item.durationMinutes))?.label || (typeof item.durationMinutes === 'number' ? (item.durationMinutes >= 60 ? `${item.durationMinutes / 60} Hour${item.durationMinutes >= 120 ? 's' : ''}` : `${item.durationMinutes} Minutes`) : item.durationMinutes)}
                           </div>
                         )}
                       </div>
