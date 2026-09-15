@@ -229,13 +229,14 @@
 
     // Standard Reminder Duration Options
     const REMINDER_DURATION_OPTIONS = [
-      { value: 5, label: "5 minutes before" },
-      { value: 10, label: "10 minutes before" },
-      { value: 15, label: "15 minutes before" },
-      { value: 30, label: "30 minutes before" },
-      { value: 50, label: "50 minutes before" },
-      { value: 60, label: "1 hour before" },
-      { value: "custom", label: "Custom date & time" }
+      { value: "none", label: "No Reminder" },
+      { value: 5, label: "5 Mins before" },
+      { value: 10, label: "10 Mins before" },
+      { value: 15, label: "15 Mins before" },
+      { value: 30, label: "30 Mins before" },
+      { value: 60, label: "60 Mins before" },
+      { value: 1440, label: "1 Day before" },
+      { value: "custom", label: "Custom Date & Time" }
     ];
 
     // Initial Default Settings per Activity Type
@@ -449,6 +450,9 @@
       const [timezone, setTimezone] = useState("Asia/Kolkata (GMT+5:30)");
       const [isDevToolOpen, setIsDevToolOpen] = useState(false);
       const [justSavedOrChangedTime, setJustSavedOrChangedTime] = useState(false);
+      const [modalSnoozeMinutes, setModalSnoozeMinutes] = useState(5);
+      const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
+      const [reminderCenterSearch, setReminderCenterSearch] = useState("");
 
       // Update current time based on mode (real or custom)
       useEffect(() => {
@@ -535,6 +539,9 @@
       const [toastMessage, setToastMessage] = useState(null);
       const [notifTab, setNotifTab] = useState("all"); // "all" | "read" | "unread"
       const [notifSearchQuery, setNotifSearchQuery] = useState("");
+      const [selectedReminderCenterModal, setSelectedReminderCenterModal] = useState(null);
+      const [openSettingsDropdownId, setOpenSettingsDropdownId] = useState(null);
+      const [settingsModal, setSettingsModal] = useState(null); // { mode: 'view' | 'edit', item }
 
       // Form State for Drawer
       const [formData, setFormData] = useState({
@@ -602,6 +609,11 @@
         const list = [];
 
         activities.forEach((act) => {
+          // If user selected "No Reminder", skip scheduling
+          if (act.reminderDurationMinutes === "none" || act.hasReminder === false) {
+            return;
+          }
+
           const actDate = dayjs(act.activityDate);
 
           // A reminder exists if explicitly enabled (scheduled for future date when created/saved)
@@ -822,6 +834,7 @@
       // Open Drawer for Editing Activity
       const handleOpenEditDrawer = (activity) => {
         const isCustom = activity.reminderDurationMinutes === "custom" || activity.isCustomReminder;
+        const isNone = activity.reminderDurationMinutes === "none" || activity.hasReminder === false;
         const customTimeVal = activity.customReminderDate || 
           dayjs(activity.activityDate).subtract(typeof activity.reminderDurationMinutes === "number" ? activity.reminderDurationMinutes : 15, "minute").format("YYYY-MM-DDTHH:mm");
 
@@ -835,7 +848,7 @@
           activityDate: activity.activityDate,
           durationHours: activity.durationHours || 0,
           durationMinutes: activity.durationMinutes || 15,
-          reminderDurationMinutes: isCustom ? "custom" : (activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType)),
+          reminderDurationMinutes: isNone ? "none" : (isCustom ? "custom" : (activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType))),
           customReminderDate: customTimeVal,
           isReminderUserOverridden: true,
           direction: activity.direction || "Select Direction",
@@ -863,11 +876,12 @@
       // When User explicitly changes Reminder dropdown in Drawer
       const handleReminderDurationChange = (val) => {
         const isCustomVal = val === "custom";
+        const isNoneVal = val === "none";
         setFormData((prev) => {
           const defaultCustomRem = prev.customReminderDate || (prev.activityDate ? dayjs(prev.activityDate).subtract(15, "minute").format("YYYY-MM-DDTHH:mm") : "");
           return {
             ...prev,
-            reminderDurationMinutes: isCustomVal ? "custom" : parseInt(val),
+            reminderDurationMinutes: isCustomVal ? "custom" : (isNoneVal ? "none" : parseInt(val)),
             customReminderDate: defaultCustomRem,
             isReminderUserOverridden: true
           };
@@ -886,14 +900,18 @@
         const now = dayjs(currentTime);
 
         let targetReminderDate;
-        if (formData.reminderDurationMinutes === "custom" && formData.customReminderDate) {
+        let isFutureAtSave = false;
+
+        if (formData.reminderDurationMinutes === "none") {
+          isFutureAtSave = false;
+        } else if (formData.reminderDurationMinutes === "custom" && formData.customReminderDate) {
           targetReminderDate = dayjs(formData.customReminderDate);
+          isFutureAtSave = targetReminderDate.isSameOrAfter(now);
         } else {
           const dur = typeof formData.reminderDurationMinutes === "number" ? formData.reminderDurationMinutes : 15;
           targetReminderDate = actDate.subtract(dur, "minute");
+          isFutureAtSave = targetReminderDate.isSameOrAfter(now);
         }
-
-        const isFutureAtSave = targetReminderDate.isSameOrAfter(now);
 
         const targetId = editingActivity ? editingActivity.id : `ACT-${Date.now().toString().slice(-4)}`;
         const remId = `REM-${targetId}`;
@@ -918,7 +936,7 @@
                 ...act,
                 ...formData,
                 id: act.id,
-                hasReminder: isFutureAtSave
+                hasReminder: formData.reminderDurationMinutes !== "none" && isFutureAtSave
               };
             }
             return act;
@@ -930,11 +948,11 @@
           const newAct = {
             ...formData,
             id: targetId,
-            hasReminder: isFutureAtSave,
+            hasReminder: formData.reminderDurationMinutes !== "none" && isFutureAtSave,
             createdAt: currentTime
           };
           setActivities([newAct, ...activities]);
-          showToast(`Activity "${newAct.title}" created.`);
+          showToast(`New activity "${formData.title}" created successfully.`);
         }
 
         setIsDrawerOpen(false);
@@ -949,12 +967,13 @@
       };
 
       // Update Sales Setting
-      const handleSaveSetting = (settingId, newMinutes) => {
+      const handleSaveSetting = (settingId, rawMinutes) => {
+        const parsedMinutes = rawMinutes === "none" ? "none" : (rawMinutes === "custom" ? "custom" : parseInt(rawMinutes));
         const updated = settings.map((s) => {
           if (s.id === settingId) {
             return {
               ...s,
-              durationMinutes: parseInt(newMinutes),
+              durationMinutes: parsedMinutes,
               lastModified: dayjs().format("MMM D, YYYY, h:mm:ss A"),
               modifiedBy: "Shreshth Dubey (Admin)"
             };
@@ -962,8 +981,10 @@
           return s;
         });
         setSettings(updated);
+        localStorage.setItem("fs_reminder_settings", JSON.stringify(updated));
         setEditingSetting(null);
-        showToast(`Default reminder for ${settingId} updated to ${newMinutes} minutes.`);
+        const label = parsedMinutes === "none" ? "No Reminder" : (parsedMinutes === "custom" ? "Custom date & time" : `${parsedMinutes} minutes`);
+        showToast(`Default reminder for ${settingId} updated to ${label}.`);
       };
 
       // Filtered Activities
@@ -992,6 +1013,21 @@
       // Calculate helper preview for Reminder inside drawer
       const reminderCalculationPreview = useMemo(() => {
         if (!formData.activityDate) return null;
+        if (formData.reminderDurationMinutes === "none") {
+          return {
+            type: "info",
+            text: "No reminder will be scheduled for this activity."
+          };
+        }
+        if (formData.reminderDurationMinutes === "custom") {
+          if (!formData.customReminderDate) return null;
+          const customDate = dayjs(formData.customReminderDate);
+          return {
+            type: "success",
+            text: `Custom reminder will trigger at ${customDate.format("MMM D, YYYY, h:mm A")}`
+          };
+        }
+
         const actDate = dayjs(formData.activityDate);
         const now = dayjs(currentTime);
         const isFuture = actDate.isAfter(now);
@@ -1003,7 +1039,8 @@
           };
         }
 
-        const trigger = actDate.subtract(formData.reminderDurationMinutes, "minute");
+        const dur = typeof formData.reminderDurationMinutes === "number" ? formData.reminderDurationMinutes : 15;
+        const trigger = actDate.subtract(dur, "minute");
         const isTriggerPast = trigger.isBefore(now);
 
         if (isTriggerPast) {
@@ -1015,9 +1052,9 @@
 
         return {
           type: "success",
-          text: `Reminder will trigger at ${trigger.format("MMM D, YYYY, h:mm A")} (${formData.reminderDurationMinutes} min before activity)`
+          text: `Reminder will trigger at ${trigger.format("MMM D, YYYY, h:mm A")} (${dur} min before activity)`
         };
-      }, [formData.activityDate, formData.reminderDurationMinutes, currentTime]);
+      }, [formData.activityDate, formData.reminderDurationMinutes, formData.customReminderDate, currentTime]);
 
       // Check if selected form date is in the past
       const isPastActivityDate = useMemo(() => {
@@ -1110,8 +1147,8 @@
                 <div>
                   <div className="flex items-center justify-between px-4 py-2 bg-[#1b3c6d] cursor-pointer text-white font-medium">
                     <div className="flex items-center space-x-3">
-                      <i className="fa-solid fa-chart-line w-4 text-center"></i>
-                      <span>Sales</span>
+                      <i className="fa-solid fa-chart-line w-4 text-center text-[#00c2ff]"></i>
+                      <span className="font-semibold">Sales</span>
                     </div>
                     <i className="fa-solid fa-caret-down text-[10px] text-gray-300"></i>
                   </div>
@@ -1121,13 +1158,13 @@
 
                     {/* Leads */}
                     <div className="flex items-center space-x-3 pl-8 pr-4 py-1.5 hover:bg-[#1a3763] cursor-pointer text-gray-300">
-                      <i className="fa-solid fa-folder text-[11px]"></i>
+                      <i className="fa-solid fa-user-plus text-[11px] text-gray-400"></i>
                       <span>Leads</span>
                     </div>
 
                     {/* Opportunities */}
                     <div className="flex items-center space-x-3 pl-8 pr-4 py-1.5 hover:bg-[#1a3763] cursor-pointer text-gray-300">
-                      <i className="fa-solid fa-folder text-[11px]"></i>
+                      <i className="fa-solid fa-lightbulb text-[11px] text-gray-400"></i>
                       <span>Opportunities</span>
                     </div>
 
@@ -1136,19 +1173,19 @@
                       onClick={() => setActiveNav("activities")}
                       className={`flex items-center justify-between pl-8 pr-4 py-1.5 cursor-pointer transition-colors ${
                         activeNav === "activities"
-                          ? "text-[#00c2ff] font-bold"
+                          ? "text-[#00c2ff] font-bold bg-[#1a3763]"
                           : "text-gray-300 hover:bg-[#1a3763]"
                       }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <i className={`fa-solid fa-folder text-[11px] ${activeNav === "activities" ? "text-[#00c2ff]" : ""}`}></i>
+                        <i className={`fa-solid fa-calendar-check text-[11px] ${activeNav === "activities" ? "text-[#00c2ff]" : "text-gray-400"}`}></i>
                         <span>Activities</span>
                       </div>
                     </div>
 
                     {/* Contacts */}
                     <div className="flex items-center space-x-3 pl-8 pr-4 py-1.5 hover:bg-[#1a3763] cursor-pointer text-gray-300">
-                      <i className="fa-solid fa-folder text-[11px]"></i>
+                      <i className="fa-solid fa-address-book text-[11px] text-gray-400"></i>
                       <span>Contacts</span>
                     </div>
 
@@ -1165,10 +1202,11 @@
                       }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <i className="fa-solid fa-folder text-[11px]"></i>
+                        <i className={`fa-solid fa-gear text-[11px] ${activeNav === "settings" ? "text-white" : "text-gray-400"}`}></i>
                         <span>Settings</span>
                       </div>
                     </div>
+
                   </div>
                 </div>
 
@@ -1214,9 +1252,22 @@
             <div className="border-t border-[#214373] bg-[#112747]">
               <div className="flex items-center justify-around py-2.5 text-gray-300">
 
-                {/* History */}
-                <button title="History" className="hover:text-white p-1">
-                  <i className="fa-solid fa-clock-rotate-left text-sm"></i>
+                {/* Reminder Center */}
+                <button
+                  onClick={() => setActiveNav("reminder-center")}
+                  title="Reminder Center"
+                  className={`relative px-2 py-1 rounded transition-all flex items-center justify-center cursor-pointer ${
+                    activeNav === "reminder-center"
+                      ? "bg-[#0070d2] text-white shadow-inner font-bold"
+                      : "text-gray-300 hover:text-white"
+                  }`}
+                >
+                  <i className="fa-solid fa-clock-rotate-left text-sm text-cyan-300"></i>
+                  {reminders.filter((r) => r.isTriggered || r.isDismissed || r.isSnoozed).length > 0 && (
+                    <span className="absolute -top-1.5 -right-2 bg-[#0070d2] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shadow border border-[#112747]">
+                      {reminders.filter((r) => r.isTriggered || r.isDismissed || r.isSnoozed).length}
+                    </span>
+                  )}
                 </button>
 
                 {/* Tasks */}
@@ -1558,14 +1609,13 @@
                     Activity Status
                   </button>
 
-                  {/* NEW TAB: Activity Reminder */}
+                  {/* TAB: Activity Reminder */}
                   <button
                     onClick={() => setSettingsTab("activity-reminder")}
-                    className={`pb-2.5 flex items-center space-x-1.5 transition-colors ${
+                    className={`pb-2.5 transition-colors ${
                       settingsTab === "activity-reminder" ? "tab-active" : "tab-inactive"
                     }`}
                   >
-                    <i className="fa-regular fa-bell text-blue-600"></i>
                     <span>Activity Reminder</span>
                   </button>
                 </div>
@@ -1600,48 +1650,31 @@
                   </div>
                 )}
 
-                {/* Tab 4: ACTIVITY REMINDER SETTINGS (Core Requirement) */}
+                {/* Tab 4: ACTIVITY REMINDER SETTINGS */}
                 {settingsTab === "activity-reminder" && (
                   <div className="bg-white rounded border border-[#dddbda] shadow-sm">
-
-                    {/* Filter and Action Header */}
-                    <div className="p-3.5 flex items-center justify-between border-b border-[#e5e7eb]">
-                      <div className="relative w-80">
-                        <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
-                        <input
-                          type="text"
-                          placeholder="Search Activity Reminders"
-                          className="w-full pl-8 pr-3 py-1.5 text-xs border border-[#d8dde6] rounded focus:border-[#0070d2] outline-none"
-                        />
-                      </div>
-
-                      <div className="text-xs text-gray-500 italic">
-                        <i className="fa-solid fa-circle-info text-blue-500 mr-1"></i>
-                        Defines system default reminder duration per activity type for future activities.
-                      </div>
-                    </div>
 
                     {/* Settings Table */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-left freight-table border-collapse">
                         <thead>
                           <tr>
-                            <th className="w-8 text-center"><i className="fa-solid fa-grip-vertical text-gray-400"></i></th>
                             <th className="w-10 text-center"><i className="fa-solid fa-ellipsis-vertical text-gray-400"></i></th>
                             <th>Activity Type ▽</th>
                             <th>Default Reminder ▽</th>
-                            <th>Status ▽</th>
-                            <th>Created By ▽</th>
+                            <th>Modified By ▽</th>
                             <th>Last Modified ▽</th>
-                            <th className="text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {settings.map((item, idx) => (
-                            <tr key={item.id} className="hover:bg-slate-50">
-                              <td className="text-center text-gray-300">
-                                <i className="fa-solid fa-grip-vertical text-xs"></i>
-                              </td>
+                          {settings.map((item) => (
+                            <tr 
+                              key={item.id} 
+                              onClick={() => setSettingsModal({ mode: "view", item })}
+                              className="hover:bg-slate-50 cursor-pointer text-gray-800 transition-colors"
+                            >
+
+                              {/* 3-Dot Column (Far Left) */}
                               <td className="text-center text-gray-400">
                                 <i className="fa-solid fa-ellipsis-vertical text-xs"></i>
                               </td>
@@ -1657,91 +1690,210 @@
                                 </div>
                               </td>
 
-                              {/* Default Reminder Dropdown / Display */}
+                              {/* Default Reminder Display */}
                               <td>
-                                {editingSetting === item.id ? (
-                                  <select
-                                    defaultValue={item.durationMinutes}
-                                    id={`select-dur-${item.id}`}
-                                    className="freight-select text-xs py-1 w-44 font-semibold text-blue-900 border-blue-400 focus:border-blue-600"
-                                  >
-                                    {REMINDER_DURATION_OPTIONS.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded text-xs inline-block">
-                                    {item.durationMinutes} minutes
-                                  </span>
-                                )}
-                              </td>
-
-                              {/* Status */}
-                              <td>
-                                <span className="bg-[#4bca81] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                                  {item.status}
+                                <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded text-xs inline-block">
+                                  {REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(item.durationMinutes))?.label || (typeof item.durationMinutes === 'number' ? `${item.durationMinutes} Mins before` : item.durationMinutes)}
                                 </span>
                               </td>
 
-                              {/* Created By */}
-                              <td className="text-xs text-gray-600">{item.modifiedBy}</td>
+                              {/* Modified By */}
+                              <td className="text-xs text-gray-600">{item.modifiedBy || "Shreshth Dubey"}</td>
 
                               {/* Last Modified */}
                               <td className="text-xs text-gray-600">{item.lastModified}</td>
 
-                              {/* Action: Edit Icon toggles to Save Icon */}
-                              <td className="text-right whitespace-nowrap">
-                                {editingSetting === item.id ? (
-                                  <div className="flex items-center justify-end space-x-1.5">
-                                    <button
-                                      onClick={() => {
-                                        const val = document.getElementById(`select-dur-${item.id}`).value;
-                                        handleSaveSetting(item.id, val);
-                                      }}
-                                      title="Save Default Reminder Setting"
-                                      className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer shadow-xs"
-                                    >
-                                      <i className="fa-solid fa-floppy-disk text-xs"></i>
-                                      <span>Save</span>
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingSetting(null)}
-                                      title="Cancel"
-                                      className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors cursor-pointer"
-                                    >
-                                      <i className="fa-solid fa-xmark text-xs"></i>
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => setEditingSetting(item.id)}
-                                    title="Edit Default Reminder Setting"
-                                    className="p-1.5 text-gray-500 hover:text-[#0070d2] hover:bg-blue-50 rounded transition-colors cursor-pointer text-sm"
-                                  >
-                                    <i className="fa-solid fa-pen-to-square"></i>
-                                  </button>
-                                )}
-                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
 
-                    {/* Info footer */}
-                    <div className="p-4 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex items-center justify-between">
-                      <div>
-                        Each activity type has exactly <strong>one default reminder duration</strong>. Modifying a setting affects newly created activities.
-                      </div>
-                      <div className="text-gray-500">
-                        Total Configured Types: <strong>{settings.length}</strong>
-                      </div>
-                    </div>
-
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ==================================================== */}
+            {/* VIEW 3: REMINDER CENTER MODULE PAGE (EXACT DESIGN MATCHING media_1789446404292.png) */}
+            {/* ==================================================== */}
+            {activeNav === "reminder-center" && (
+              <div className="flex-1 overflow-y-auto p-5 bg-[#f8fafc]">
+                
+                {/* Page Header */}
+                <h1 className="text-xl font-bold text-[#16325c] mb-4">Reminder Center</h1>
+
+                {/* Filter / Search Bar */}
+                <div className="mb-4">
+                  <div className="relative max-w-xs">
+                    <i className="fa-solid fa-filter absolute left-3.5 top-3 text-gray-400 text-xs"></i>
+                    <input
+                      type="text"
+                      placeholder="Search Reminder Center..."
+                      value={reminderCenterSearch}
+                      onChange={(e) => setReminderCenterSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded bg-white text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#0070d2] shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Table Container */}
+                <div className="bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto min-h-[400px]">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-[#eef4ff] text-[#16325c] font-semibold border-b border-gray-200">
+                          <th className="p-3 w-10 text-center">
+                            <i className="fa-solid fa-grip-vertical text-gray-400"></i>
+                          </th>
+                          <th className="p-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <span>SOURCE</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                          <th className="p-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <span>NUMBER</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                          <th className="p-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <span>SUBJECT</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                          <th className="p-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <span>CONTENT</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                          <th className="p-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <span>DUE TIME</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                          <th className="p-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <span>TIME ZONE</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                          <th className="p-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center space-x-1.5">
+                              <span>VIEW ENTITY</span>
+                              <i className="fa-solid fa-filter text-[10px] text-gray-400"></i>
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const reminderList = reminders
+                            .filter((r) => r.isTriggered || r.isDismissed || r.isSnoozed)
+                            .map((rem) => {
+                              const act = activities.find((a) => a.id === rem.activityId);
+                              return {
+                                source: "Sales Activity",
+                                number: rem.activityId,
+                                subject: rem.subject || (act ? act.title : "Untitled Activity"),
+                                content: (act ? act.notes || act.purpose : "") || "--",
+                                dueTime: rem.effectiveTriggerDate || rem.reminderDate || rem.activityDate,
+                                timezone: timezone || "(GMT+05:30) Asia/Kolkata",
+                                rawAct: act,
+                                rawRem: rem
+                              };
+                            })
+                            .filter((item) => {
+                              if (!reminderCenterSearch) return true;
+                              const q = reminderCenterSearch.toLowerCase();
+                              return (
+                                item.subject.toLowerCase().includes(q) ||
+                                item.number.toLowerCase().includes(q) ||
+                                item.source.toLowerCase().includes(q) ||
+                                item.content.toLowerCase().includes(q)
+                              );
+                            });
+
+                          if (reminderList.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan="8" className="text-center py-16 text-gray-400">
+                                  <div className="flex flex-col items-center justify-center space-y-2">
+                                    <i className="fa-regular fa-bell-slash text-3xl text-gray-300"></i>
+                                    <span className="text-sm font-medium text-gray-500">No triggered reminders in Reminder Center yet</span>
+                                    <span className="text-xs text-gray-400">Reminders will appear here automatically as soon as their trigger time arrives.</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return reminderList.map((item, idx) => (
+                            <tr 
+                              key={idx} 
+                              onClick={() => setSelectedReminderCenterModal(item)}
+                              className="border-b border-gray-200 hover:bg-slate-50 text-gray-800 transition-colors cursor-pointer"
+                            >
+                              <td className="p-3 text-center text-gray-400">
+                                <i className="fa-solid fa-ellipsis-vertical"></i>
+                              </td>
+                              <td className="p-3 font-medium whitespace-nowrap">{item.source}</td>
+                              <td className="p-3 text-gray-600 font-mono whitespace-nowrap">{item.number}</td>
+                              <td className="p-3 font-bold text-gray-900">{item.subject}</td>
+                              <td className="p-3 text-gray-600 truncate max-w-xs">{item.content}</td>
+                              <td className="p-3 text-gray-700 whitespace-nowrap font-mono">
+                                {formatDateTime(item.dueTime)}
+                              </td>
+                              <td className="p-3 text-gray-500 whitespace-nowrap text-[11px]">{item.timezone}</td>
+                              <td className="p-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedReminderCenterModal(item)}
+                                  className="px-4 py-1.5 bg-[#1d70b8] hover:bg-[#155fa0] text-white rounded text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  View Entity
+                                </button>
+                              </td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer */}
+                  <div className="px-6 py-3 bg-white border-t border-gray-200 flex items-center justify-between text-xs text-gray-600">
+                    <div className="flex items-center space-x-2">
+                      <span>Items per page:</span>
+                      <select className="border border-gray-300 rounded px-2.5 py-1 text-xs bg-white">
+                        <option>25</option>
+                        <option>50</option>
+                        <option>100</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      {(() => {
+                        const count = reminders.filter((r) => r.isTriggered || r.isDismissed || r.isSnoozed).length;
+                        return (
+                          <span>1 - {count} of {count}</span>
+                        );
+                      })()}
+                      <div className="flex items-center space-x-1.5">
+                        <button type="button" className="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center transition-colors cursor-pointer">
+                          <i className="fa-solid fa-chevron-left text-[11px]"></i>
+                        </button>
+                        <button type="button" className="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center transition-colors cursor-pointer">
+                          <i className="fa-solid fa-chevron-right text-[11px]"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
 
@@ -2129,86 +2281,33 @@
 
               return (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                  {/* Dark Backdrop */}
+                  {/* Backdrop */}
                   <div 
-                    className="fixed inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-200" 
+                    className="fixed inset-0 bg-black/40 transition-opacity duration-200" 
                     onClick={() => handleDismissReminder(activeAlertModalReminder.id)}
                   ></div>
 
-                  {/* Modal Card */}
-                  <div className="relative bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-scale-in z-[210]">
+                  {/* Legacy Modal Card matching image media_1789445972515.png */}
+                  <div className="relative bg-[#f8fafc] rounded-md shadow-2xl border border-gray-300 w-full max-w-[460px] overflow-hidden z-[210]">
                     
-                    {/* Header: Freightoscope Navy Blue (#16325c) */}
-                    <div className="bg-[#16325c] px-5 py-3.5 flex items-center justify-between text-white shadow-sm">
-                      <div className="flex items-center space-x-2.5">
-                        <i className={`${getActivityIcon(activeAlertModalReminder.activityType)} text-amber-400 text-base`}></i>
-                        <h3 className="font-bold text-sm text-white tracking-wide">Activity Reminder</h3>
-                      </div>
-                      <button
-                        onClick={() => handleDismissReminder(activeAlertModalReminder.id)}
-                        className="text-white/70 hover:text-white text-lg font-light transition-colors cursor-pointer p-1"
-                        title="Dismiss Reminder"
-                      >
-                        <i className="fa-solid fa-xmark"></i>
-                      </button>
+                    {/* Header: Solid Dark Blue (#1b4079) */}
+                    <div className="bg-[#1b4079] px-4 py-2.5 flex items-center justify-between text-white shadow-xs">
+                      <h3 className="font-semibold text-sm text-white tracking-wide">Reminder</h3>
                     </div>
 
                     {/* Body Content */}
-                    <div className="p-5 space-y-3.5">
+                    <div className="p-5 space-y-4 bg-white">
                       {/* Subject / Title */}
                       <div>
-                        <h2 className="text-base font-bold text-gray-900 leading-snug">
+                        <h2 className="text-xl font-bold text-gray-800 leading-tight">
                           {activeAlertModalReminder.subject}
                         </h2>
                       </div>
 
-                      {/* Key Details Container */}
-                      <div className="bg-slate-50 border border-slate-200/90 rounded-lg p-3.5 space-y-2.5 text-xs text-gray-700">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                          <div className="flex items-center space-x-2 text-gray-600 font-medium">
-                            <i className="fa-regular fa-clock text-[#0070d2] text-xs"></i>
-                            <span>Scheduled Time:</span>
-                          </div>
-                          <span className="font-bold text-[#16325c]">
-                            {formatDateTime(activeAlertModalReminder.activityDate)}
-                          </span>
-                        </div>
-
-                        {activeAlertModalReminder.party && (
-                          <div className="flex items-start justify-between space-x-2">
-                            <div className="flex items-center space-x-2 text-gray-600 font-medium min-w-[90px]">
-                              <i className="fa-solid fa-building text-[#0070d2] text-xs"></i>
-                              <span>Party:</span>
-                            </div>
-                            <span className="font-semibold text-gray-900 text-right">{activeAlertModalReminder.party}</span>
-                          </div>
-                        )}
-
-                        {activeAlertModalReminder.opportunity && (
-                          <div className="flex items-start justify-between space-x-2">
-                            <div className="flex items-center space-x-2 text-gray-600 font-medium min-w-[90px]">
-                              <i className="fa-solid fa-briefcase text-[#0070d2] text-xs"></i>
-                              <span>Opportunity:</span>
-                            </div>
-                            <span className="font-semibold text-gray-900 text-right">{activeAlertModalReminder.opportunity}</span>
-                          </div>
-                        )}
-
-                        {contactInfo && (
-                          <div className="flex items-start justify-between space-x-2">
-                            <div className="flex items-center space-x-2 text-gray-600 font-medium min-w-[90px]">
-                              <i className="fa-solid fa-address-book text-[#0070d2] text-xs"></i>
-                              <span>Contact:</span>
-                            </div>
-                            <span className="font-semibold text-gray-900 text-right">{contactInfo}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons Row */}
-                      <div className="pt-2 flex items-center justify-between border-t border-gray-100">
-                        {/* View Activity */}
+                      {/* View Entity Button */}
+                      <div>
                         <button
+                          type="button"
                           onClick={() => {
                             if (targetActivity) {
                               handleOpenEditDrawer(targetActivity);
@@ -2216,37 +2315,44 @@
                               showToast("Activity details not found.");
                             }
                           }}
-                          className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-xs"
-                          title="Open Activity Details"
+                          className="px-3.5 py-1.5 bg-[#1d70b8] hover:bg-[#155fa0] text-white rounded text-xs font-medium transition-colors cursor-pointer shadow-2xs"
                         >
-                          <i className="fa-solid fa-arrow-up-right-from-square text-[#0070d2]"></i>
-                          <span>View Activity</span>
+                          View Entity
                         </button>
+                      </div>
 
-                        {/* Snooze & Dismiss */}
-                        <div className="flex items-center space-x-1.5">
-                          <button
-                            onClick={() => handleSnoozeReminder(activeAlertModalReminder.id, 5)}
-                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer"
+                      {/* Snooze Time (minutes) Section */}
+                      <div className="pt-2">
+                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                          Snooze Time (minutes)
+                        </label>
+                        <div className="flex items-center space-x-2.5">
+                          <select
+                            value={modalSnoozeMinutes}
+                            onChange={(e) => setModalSnoozeMinutes(parseInt(e.target.value))}
+                            className="bg-white border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-800 focus:outline-none focus:border-[#1d70b8] w-44 font-sans"
                           >
-                            <i className="fa-solid fa-clock-rotate-left text-amber-700"></i>
-                            <span>Snooze (5m)</span>
-                          </button>
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={15}>15</option>
+                            <option value={30}>30</option>
+                            <option value={60}>60</option>
+                          </select>
 
                           <button
-                            onClick={() => handleSnoozeReminder(activeAlertModalReminder.id, 15)}
-                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1 cursor-pointer"
-                          >
-                            <i className="fa-solid fa-clock-rotate-left text-amber-700"></i>
-                            <span>Snooze (15m)</span>
-                          </button>
-
-                          <button
+                            type="button"
                             onClick={() => handleDismissReminder(activeAlertModalReminder.id)}
-                            className="px-3 py-1.5 bg-[#16325c] hover:bg-[#0f2341] text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center space-x-1 cursor-pointer"
+                            className="px-4 py-1.5 bg-[#e9ecef] hover:bg-[#deef6] border border-gray-300 text-gray-700 rounded text-xs font-medium transition-colors cursor-pointer"
                           >
-                            <i className="fa-solid fa-check"></i>
-                            <span>Dismiss</span>
+                            Dismiss
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSnoozeReminder(activeAlertModalReminder.id, modalSnoozeMinutes)}
+                            className="px-5 py-1.5 bg-[#1d70b8] hover:bg-[#155fa0] text-white rounded text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+                          >
+                            Snooze
                           </button>
                         </div>
                       </div>
@@ -2255,6 +2361,348 @@
                 </div>
               );
             })()}
+
+            {/* ==================================================== */}
+            {/* REMINDER CENTER DETAIL MODAL (EXACT DESIGN MATCHING media_1789448115642.png) */}
+            {/* Opened when clicking any reminder record in Reminder Center */}
+            {/* ==================================================== */}
+            {selectedReminderCenterModal && (() => {
+              const dueObj = dayjs(selectedReminderCenterModal.dueTime);
+              const dateStr = dueObj.format("MMM D, YYYY");
+              const hourStr = dueObj.format("hh");
+              const minStr = dueObj.format("mm");
+              const ampmStr = dueObj.format("A");
+
+              return (
+                <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-200"
+                    onClick={() => setSelectedReminderCenterModal(null)}
+                  ></div>
+
+                  {/* Modal Dialog Card - Exact 760px wide layout matching media_1789448740878.png */}
+                  <div className="relative bg-white rounded-md shadow-2xl border border-gray-300 w-full max-w-[760px] overflow-hidden z-[230] text-xs">
+                    
+                    {/* Header: Exact Dark Blue (#16325c) */}
+                    <div className="bg-[#16325c] px-5 py-3 flex items-center justify-between text-white shadow-xs">
+                      <h3 className="font-semibold text-sm text-white tracking-wide">New Reminder</h3>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReminderCenterModal(null)}
+                        className="text-white hover:text-gray-200 text-base font-bold transition-colors cursor-pointer"
+                        title="Close"
+                      >
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="p-6 space-y-4 bg-white select-none">
+                      
+                      {/* Top Row: Add New Reminder & Source/Number Badge */}
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          disabled
+                          className="px-3.5 py-1.5 border border-gray-300 rounded bg-[#e9ecef] text-xs font-semibold text-gray-500 cursor-not-allowed flex items-center space-x-1.5 shadow-2xs opacity-75"
+                        >
+                          <i className="fa-solid fa-plus text-xs"></i>
+                          <span>Add New Reminder</span>
+                        </button>
+
+                        <div className="border border-gray-300 bg-[#f8fafc] rounded px-3.5 py-1.5 text-[11px] text-gray-700 text-right font-sans leading-tight shadow-2xs">
+                          <div><span className="font-normal text-gray-500">Source:</span> <span className="font-medium text-gray-800">{selectedReminderCenterModal.source || "Sales Activity"}</span></div>
+                          <div><span className="font-normal text-gray-500">Number:</span> <span className="font-medium text-gray-800">{selectedReminderCenterModal.number || "ACT1001"}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Reminder Dropdown (UI/UX Disabled state) */}
+                      <div>
+                        <div className="relative">
+                          <select
+                            disabled
+                            tabIndex={-1}
+                            className="w-full bg-[#f8fafc] border border-gray-300/90 rounded px-3 py-2 text-xs font-medium text-gray-500 cursor-not-allowed appearance-none focus:outline-none"
+                          >
+                            <option>Reminder1</option>
+                          </select>
+                          <div className="absolute right-3.5 top-2.5 pointer-events-none text-gray-400 text-xs">
+                            <i className="fa-solid fa-chevron-down"></i>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subject Field */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Subject <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          tabIndex={-1}
+                          value={selectedReminderCenterModal.subject || "Reminder1"}
+                          className="w-full bg-[#f8fafc] border border-gray-300/90 rounded px-3 py-2 text-xs font-medium text-gray-600 cursor-not-allowed focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Content Textarea */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Content
+                        </label>
+                        <textarea
+                          readOnly
+                          tabIndex={-1}
+                          rows="2"
+                          value={selectedReminderCenterModal.content !== "--" ? selectedReminderCenterModal.content : ""}
+                          className="w-full bg-[#f8fafc] border border-gray-300/90 rounded px-3 py-2 text-xs font-medium text-gray-600 cursor-not-allowed focus:outline-none resize-none"
+                        ></textarea>
+                      </div>
+
+                      {/* Radio Options: Fixed Time */}
+                      <div className="flex items-center space-x-3 pt-1">
+                        <label className="flex items-center space-x-2 text-xs font-semibold text-gray-700 cursor-not-allowed">
+                          <input
+                            type="radio"
+                            checked
+                            disabled
+                            className="w-4 h-4 text-[#16325c] accent-[#16325c] cursor-not-allowed opacity-75"
+                          />
+                          <span className="text-gray-600">Fixed Time</span>
+                        </label>
+                      </div>
+
+                      {/* Date and Time Row */}
+                      <div className="grid grid-cols-2 gap-6">
+                        {/* Date Field */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                          <div className="flex items-center border border-gray-300/90 rounded bg-[#f8fafc] overflow-hidden cursor-not-allowed">
+                            <input
+                              type="text"
+                              readOnly
+                              tabIndex={-1}
+                              value={dateStr}
+                              className="w-full bg-[#f8fafc] px-3 py-2 text-xs font-medium text-gray-600 cursor-not-allowed outline-none"
+                            />
+                            <div className="px-3.5 py-2 bg-[#f1f5f9] border-l border-gray-300/90 text-gray-400 text-xs flex items-center justify-center">
+                              <i className="fa-regular fa-calendar-days text-sm"></i>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Time Field */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Time</label>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              readOnly
+                              tabIndex={-1}
+                              value={hourStr}
+                              className="w-14 text-center bg-[#f8fafc] border border-gray-300/90 rounded py-2 text-xs font-medium text-gray-600 cursor-not-allowed outline-none font-mono"
+                            />
+                            <span className="text-gray-400 font-bold text-xs">:</span>
+                            <input
+                              type="text"
+                              readOnly
+                              tabIndex={-1}
+                              value={minStr}
+                              className="w-14 text-center bg-[#f8fafc] border border-gray-300/90 rounded py-2 text-xs font-medium text-gray-600 cursor-not-allowed outline-none font-mono"
+                            />
+                            <div className="px-4 py-2 bg-[#f1f5f9] border border-blue-300/70 text-[#0070d2]/80 rounded text-xs font-semibold ml-1 cursor-not-allowed">
+                              {ampmStr}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Time Zone Dropdown */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Time Zone</label>
+                        <div className="relative">
+                          <select
+                            disabled
+                            tabIndex={-1}
+                            className="w-full bg-[#f8fafc] border border-gray-300/90 rounded px-3 py-2 text-xs font-medium text-gray-500 cursor-not-allowed appearance-none focus:outline-none"
+                          >
+                            <option>{selectedReminderCenterModal.timezone || "(GMT-06:00) Guadalajara, Mexico City, Monterrey"}</option>
+                          </select>
+                          <div className="absolute right-3.5 top-2.5 pointer-events-none text-gray-400 text-xs">
+                            <i className="fa-solid fa-chevron-down"></i>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Actions: Remove on left, Cancel & Save on right */}
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-6">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedReminderCenterModal.rawRem) {
+                              handleDismissReminder(selectedReminderCenterModal.rawRem.id);
+                              showToast("Reminder removed from Reminder Center");
+                            }
+                            setSelectedReminderCenterModal(null);
+                          }}
+                          className="px-4 py-2 bg-[#ff0040] hover:bg-red-700 text-white rounded text-xs font-bold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <i className="fa-solid fa-trash-can text-xs"></i>
+                          <span>Remove</span>
+                        </button>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReminderCenterModal(null)}
+                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReminderCenterModal(null)}
+                            className="px-5 py-2 bg-[#0070d2] hover:bg-[#005fb3] text-white rounded text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ==================================================== */}
+            {/* SMALL SETTINGS VIEW / EDIT MODAL                     */}
+            {/* ==================================================== */}
+            {settingsModal && (() => {
+              const isEdit = settingsModal.mode === "edit";
+              const item = settingsModal.item;
+
+              return (
+                <div className="fixed inset-0 z-[240] flex items-center justify-center p-4">
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-200"
+                    onClick={() => setSettingsModal(null)}
+                  ></div>
+
+                  {/* Small Dialog Card */}
+                  <div className="relative bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[420px] overflow-hidden z-[250] text-xs">
+                    
+                    {/* Header: Dark Blue (#16325c) */}
+                    <div className="bg-[#16325c] px-4 py-3 flex items-center justify-between text-white shadow-xs">
+                      <h3 className="font-semibold text-sm text-white tracking-wide">
+                        {isEdit ? "Edit Default Reminder Setting" : "View Default Reminder Setting"}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setSettingsModal(null)}
+                        className="text-white hover:text-gray-200 text-base font-bold transition-colors cursor-pointer"
+                        title="Close"
+                      >
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="p-5 space-y-4 bg-white">
+                      
+                      {/* Activity Type */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Activity Type
+                        </label>
+                        <div className="flex items-center space-x-2 bg-[#f8fafc] border border-gray-300 rounded px-3 py-2 font-semibold text-gray-800">
+                          {item.activityType === "Calls" && <i className="fa-solid fa-phone text-blue-600 text-xs"></i>}
+                          {item.activityType === "Email" && <i className="fa-regular fa-envelope text-emerald-600 text-xs"></i>}
+                          {item.activityType === "Meeting" && <i className="fa-solid fa-user-group text-purple-600 text-xs"></i>}
+                          {item.activityType === "Task" && <i className="fa-solid fa-list-check text-amber-600 text-xs"></i>}
+                          <span>{item.activityType}</span>
+                        </div>
+                      </div>
+
+                      {/* Default Reminder */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Default Reminder Duration
+                        </label>
+                        {isEdit ? (
+                          <select
+                            id="edit-modal-dur-select"
+                            defaultValue={item.durationMinutes}
+                            className="w-full freight-select font-semibold text-blue-900 border-blue-400 focus:border-[#0070d2] py-2"
+                          >
+                            {REMINDER_DURATION_OPTIONS.filter((opt) => opt.value !== "custom").map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="bg-[#f8fafc] border border-gray-300 rounded px-3 py-2 font-semibold text-blue-700">
+                            {REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(item.durationMinutes))?.label || (typeof item.durationMinutes === 'number' ? `${item.durationMinutes} Mins before` : item.durationMinutes)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="flex items-center justify-end space-x-2 pt-3 border-t border-gray-200">
+                        {isEdit ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsModal(null)}
+                              className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sel = document.getElementById("edit-modal-dur-select");
+                                if (sel) {
+                                  handleSaveSetting(item.id, sel.value);
+                                }
+                                setSettingsModal(null);
+                              }}
+                              className="px-5 py-1.5 bg-[#0070d2] hover:bg-[#005fb3] text-white rounded text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                            >
+                              Save
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsModal(null)}
+                              className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Close
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsModal({ mode: "edit", item })}
+                              className="px-5 py-1.5 bg-[#0070d2] hover:bg-[#005fb3] text-white rounded text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                            >
+                              Edit
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+
 
             {/* ==================================================== */}
             {/* NOTIFICATIONS POPOVER (EMERGES FROM BELL ICON AT BOTTOM-LEFT) */}
