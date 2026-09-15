@@ -877,12 +877,26 @@
       const handleReminderDurationChange = (val) => {
         const isCustomVal = val === "custom";
         const isNoneVal = val === "none";
+        const parsedVal = isCustomVal ? "custom" : (isNoneVal ? "none" : parseInt(val, 10));
+
         setFormData((prev) => {
-          const defaultCustomRem = prev.customReminderDate || (prev.activityDate ? dayjs(prev.activityDate).subtract(15, "minute").format("YYYY-MM-DDTHH:mm") : "");
+          let updatedCustomRemDate = prev.customReminderDate;
+          if (typeof parsedVal === "number" && prev.activityDate) {
+            updatedCustomRemDate = dayjs(prev.activityDate)
+              .subtract(parsedVal, "minute")
+              .format("YYYY-MM-DDTHH:mm");
+          } else if (isNoneVal) {
+            updatedCustomRemDate = "";
+          } else if (isCustomVal && (!prev.customReminderDate || prev.customReminderDate === "")) {
+            updatedCustomRemDate = prev.activityDate 
+              ? dayjs(prev.activityDate).subtract(15, "minute").format("YYYY-MM-DDTHH:mm")
+              : "";
+          }
+
           return {
             ...prev,
-            reminderDurationMinutes: isCustomVal ? "custom" : (isNoneVal ? "none" : parseInt(val)),
-            customReminderDate: defaultCustomRem,
+            reminderDurationMinutes: parsedVal,
+            customReminderDate: updatedCustomRemDate,
             isReminderUserOverridden: true
           };
         });
@@ -2041,7 +2055,22 @@
                           <input
                             type="datetime-local"
                             value={formData.activityDate ? formData.activityDate.slice(0, 16) : ""}
-                            onChange={(e) => setFormData({ ...formData, activityDate: e.target.value })}
+                            onChange={(e) => {
+                              const newActDate = e.target.value;
+                              setFormData((prev) => {
+                                let updatedCustomRemDate = prev.customReminderDate;
+                                if (typeof prev.reminderDurationMinutes === "number" && newActDate) {
+                                  updatedCustomRemDate = dayjs(newActDate)
+                                    .subtract(prev.reminderDurationMinutes, "minute")
+                                    .format("YYYY-MM-DDTHH:mm");
+                                }
+                                return {
+                                  ...prev,
+                                  activityDate: newActDate,
+                                  customReminderDate: updatedCustomRemDate
+                                };
+                              });
+                            }}
                             required
                             className="freight-input pr-8 text-xs"
                           />
@@ -2082,40 +2111,45 @@
                     </div>
 
                     {/* ==================================================== */}
-                    {/* INTEGRATED FIELD: REMINDER DURATION DROPDOWN         */}
-                    {/* Native Freightoscope form field layout               */}
+                    {/* INTEGRATED FIELDS: REMINDER DROP & REMINDER DATE & TIME */}
+                    {/* Displayed in the same row side-by-side              */}
                     {/* ==================================================== */}
-                    <div>
-                      <label className="freight-label">Reminder</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="freight-label">Drop</label>
+                        <select
+                          value={formData.reminderDurationMinutes}
+                          onChange={(e) => handleReminderDurationChange(e.target.value)}
+                          disabled={isPastActivityDate}
+                          className={`freight-select ${
+                            isPastActivityDate 
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" 
+                              : ""
+                          }`}
+                        >
+                          {REMINDER_DURATION_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <select
-                        value={formData.reminderDurationMinutes}
-                        onChange={(e) => handleReminderDurationChange(e.target.value)}
-                        disabled={isPastActivityDate}
-                        className={`freight-select ${
-                          isPastActivityDate 
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" 
-                            : ""
-                        }`}
-                      >
-                        {REMINDER_DURATION_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      {/* Minimal Compact Custom Reminder Date & Time Input */}
-                      {formData.reminderDurationMinutes === "custom" && !isPastActivityDate && (
-                        <div className="mt-2">
-                          <input
-                            type="datetime-local"
-                            value={formData.customReminderDate ? formData.customReminderDate.slice(0, 16) : ""}
-                            onChange={(e) => setFormData({ ...formData, customReminderDate: e.target.value, isReminderUserOverridden: true })}
-                            className="freight-input text-xs font-mono py-1.5 px-2.5 bg-white border-blue-300 focus:border-[#0070d2]"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="freight-label">Date &amp; Time</label>
+                        <input
+                          type="datetime-local"
+                          value={formData.customReminderDate ? formData.customReminderDate.slice(0, 16) : ""}
+                          onChange={(e) => setFormData({ ...formData, customReminderDate: e.target.value, isReminderUserOverridden: true })}
+                          readOnly={formData.reminderDurationMinutes !== "custom" || isPastActivityDate}
+                          disabled={isPastActivityDate || formData.reminderDurationMinutes === "none"}
+                          className={`freight-input text-xs font-mono ${
+                            formData.reminderDurationMinutes === "custom" && !isPastActivityDate
+                              ? "bg-white border-blue-400 text-gray-900 focus:border-[#0070d2]"
+                              : "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300"
+                          }`}
+                        />
+                      </div>
                     </div>
 
                     {/* Row: Direction & Purpose */}
