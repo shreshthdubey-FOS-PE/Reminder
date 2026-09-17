@@ -544,7 +544,7 @@
       const [openSettingsDropdownId, setOpenSettingsDropdownId] = useState(null);
       const [settingsModal, setSettingsModal] = useState(null); // { mode: 'view' | 'edit', item }
       const [activeActivityActionMenu, setActiveActivityActionMenu] = useState(null); // activity id for open 3-dot menu
-      const [viewActivityModal, setViewActivityModal] = useState(null); // activity object for read-only view modal
+      const [isDrawerReadOnly, setIsDrawerReadOnly] = useState(false); // view mode for activity side drawer
       const [reminderValidationError, setReminderValidationError] = useState(""); // inline error for custom reminder
 
       // Form State for Drawer
@@ -833,6 +833,41 @@
           notes: ""
         });
         setReminderValidationError("");
+        setIsDrawerReadOnly(false);
+        setIsDrawerOpen(true);
+      };
+
+      // Open Drawer for Viewing Activity (Read-Only)
+      const handleOpenViewDrawer = (activity) => {
+        const isCustom = activity.reminderDurationMinutes === "custom" || activity.isCustomReminder;
+        const isNone = activity.reminderDurationMinutes === "none" || activity.hasReminder === false;
+        const customTimeVal = activity.customReminderDate || 
+          dayjs(activity.activityDate).subtract(typeof activity.reminderDurationMinutes === "number" ? activity.reminderDurationMinutes : 15, "minute").format("YYYY-MM-DDTHH:mm");
+
+        setEditingActivity(activity);
+        setFormData({
+          activityType: activity.activityType,
+          title: activity.title,
+          party: activity.party || "Select Party or Lead",
+          opportunity: activity.opportunity || "Select Opportunity",
+          contacts: activity.contacts || "Select Contacts",
+          activityDate: activity.activityDate,
+          durationHours: activity.durationHours || 0,
+          durationMinutes: activity.durationMinutes || 15,
+          reminderDurationMinutes: isNone ? "none" : (isCustom ? "custom" : (activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType))),
+          customReminderDate: customTimeVal,
+          isReminderUserOverridden: true,
+          direction: activity.direction || "Select Direction",
+          purpose: activity.purpose || "Select Purpose",
+          outcome: activity.outcome || "Select Outcome",
+          status: activity.status || "New",
+          priority: activity.priority || "Low",
+          owner: activity.owner || "Shreshth Dubey",
+          teamMembers: activity.teamMembers || [],
+          notes: activity.notes || ""
+        });
+        setReminderValidationError("");
+        setIsDrawerReadOnly(true);
         setIsDrawerOpen(true);
       };
 
@@ -866,6 +901,41 @@
           notes: activity.notes || ""
         });
         setReminderValidationError("");
+        setIsDrawerReadOnly(false);
+        setIsDrawerOpen(true);
+      };
+
+      // Duplicate Activity: opens as a new entry with cloned fields so user can modify before saving
+      const handleDuplicateActivity = (activity) => {
+        const isCustom = activity.reminderDurationMinutes === "custom" || activity.isCustomReminder;
+        const isNone = activity.reminderDurationMinutes === "none" || activity.hasReminder === false;
+        const customTimeVal = activity.customReminderDate || 
+          dayjs(activity.activityDate).subtract(typeof activity.reminderDurationMinutes === "number" ? activity.reminderDurationMinutes : 15, "minute").format("YYYY-MM-DDTHH:mm");
+
+        setEditingActivity(null); // Not editing existing; creating new entry
+        setFormData({
+          activityType: activity.activityType,
+          title: `Copy of ${activity.title}`,
+          party: activity.party || "Select Party or Lead",
+          opportunity: activity.opportunity || "Select Opportunity",
+          contacts: activity.contacts || "Select Contacts",
+          activityDate: activity.activityDate,
+          durationHours: activity.durationHours || 0,
+          durationMinutes: activity.durationMinutes || 15,
+          reminderDurationMinutes: isNone ? "none" : (isCustom ? "custom" : (activity.reminderDurationMinutes || getDefaultDurationForType(activity.activityType))),
+          customReminderDate: customTimeVal,
+          isReminderUserOverridden: true,
+          direction: activity.direction || "Select Direction",
+          purpose: activity.purpose || "Select Purpose",
+          outcome: activity.outcome || "Select Outcome",
+          status: "New",
+          priority: activity.priority || "Low",
+          owner: activity.owner || "Shreshth Dubey",
+          teamMembers: activity.teamMembers || [],
+          notes: activity.notes || ""
+        });
+        setReminderValidationError("");
+        setIsDrawerReadOnly(false);
         setIsDrawerOpen(true);
       };
 
@@ -1530,7 +1600,7 @@
                                           type="button"
                                           onClick={() => {
                                             setActiveActivityActionMenu(null);
-                                            setViewActivityModal(act);
+                                            handleOpenViewDrawer(act);
                                           }}
                                           className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
                                         >
@@ -1541,14 +1611,7 @@
                                           type="button"
                                           onClick={() => {
                                             setActiveActivityActionMenu(null);
-                                            const copy = {
-                                              ...act,
-                                              id: `ACT-${Date.now().toString().slice(-4)}`,
-                                              title: `Copy of ${act.title}`,
-                                              createdAt: currentTime
-                                            };
-                                            setActivities([copy, ...activities]);
-                                            showToast(`Duplicated as "${copy.title}"`);
+                                            handleDuplicateActivity(act);
                                           }}
                                           className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
                                         >
@@ -1573,7 +1636,7 @@
                                 </td>
 
                                 {/* Title */}
-                                <td className="font-semibold text-gray-900 hover:text-[#0070d2]" onClick={() => handleOpenEditDrawer(act)}>
+                                <td className="font-semibold text-gray-900 hover:text-[#0070d2] cursor-pointer" onClick={() => handleOpenViewDrawer(act)}>
                                   {act.title}
                                 </td>
 
@@ -2032,7 +2095,7 @@
                   {/* Drawer Header */}
                   <div className="px-6 py-4 border-b border-[#e5e7eb] flex items-center justify-between bg-white flex-shrink-0">
                     <h2 className="text-base font-bold text-[#181818]">
-                      {editingActivity ? "Edit Activity" : "Add New Activity"}
+                      {isDrawerReadOnly ? "View Activity" : (editingActivity ? "Edit Activity" : "Add New Activity")}
                     </h2>
                     <button
                       onClick={() => setIsDrawerOpen(false)}
@@ -2060,10 +2123,11 @@
                           <button
                             type="button"
                             key={t.key}
+                            disabled={isDrawerReadOnly}
                             onClick={() => handleTypeChange(t.key)}
                             className={`py-2 px-3 rounded text-xs flex items-center justify-center space-x-2 transition-all ${
                               formData.activityType === t.key ? "type-btn-active" : "type-btn-inactive"
-                            }`}
+                            } ${isDrawerReadOnly ? "cursor-not-allowed opacity-75 bg-gray-50" : ""}`}
                           >
                             <i className={`fa-solid ${t.icon} text-xs`}></i>
                             <span>{t.label}</span>
@@ -2081,9 +2145,10 @@
                         type="text"
                         placeholder="Enter activity title"
                         value={formData.title}
+                        disabled={isDrawerReadOnly}
                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         required
-                        className="freight-input"
+                        className={`freight-input ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                       />
                     </div>
 
@@ -2095,8 +2160,9 @@
                         </label>
                         <select
                           value={formData.party}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, party: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Select Party or Lead">Select Party or Lead</option>
                           <option value="Maersk Line India Pvt Ltd">Maersk Line India Pvt Ltd</option>
@@ -2111,8 +2177,9 @@
                         <label className="freight-label">Opportunity</label>
                         <select
                           value={formData.opportunity}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, opportunity: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Select Opportunity">Select Opportunity</option>
                           <option value="Ocean Freight Contract 2026">Ocean Freight Contract 2026</option>
@@ -2128,8 +2195,9 @@
                       <label className="freight-label">Contacts</label>
                       <select
                         value={formData.contacts}
+                        disabled={isDrawerReadOnly}
                         onChange={(e) => setFormData({ ...formData, contacts: e.target.value })}
-                        className="freight-select"
+                        className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                       >
                         <option value="Select Contacts">Select Contacts</option>
                         <option value="Anita Desai">Anita Desai</option>
@@ -2153,6 +2221,7 @@
                           <input
                             type="datetime-local"
                             value={formData.activityDate ? formData.activityDate.slice(0, 16) : ""}
+                            disabled={isDrawerReadOnly}
                             onChange={(e) => {
                               const newActDate = e.target.value;
                               setFormData((prev) => {
@@ -2170,7 +2239,7 @@
                               });
                             }}
                             required
-                            className="freight-input pr-8 text-xs"
+                            className={`freight-input pr-8 text-xs ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                           />
                         </div>
                       </div>
@@ -2184,9 +2253,10 @@
                               min="0"
                               max="24"
                               placeholder="HH"
+                              disabled={isDrawerReadOnly}
                               value={formData.durationHours}
                               onChange={(e) => setFormData({ ...formData, durationHours: parseInt(e.target.value) || 0 })}
-                              className="freight-input text-center py-1.5"
+                              className={`freight-input text-center py-1.5 ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                             />
                             <span className="text-xs text-gray-500 font-semibold">h</span>
                           </div>
@@ -2198,9 +2268,10 @@
                               max="59"
                               step="5"
                               placeholder="MM"
+                              disabled={isDrawerReadOnly}
                               value={formData.durationMinutes}
                               onChange={(e) => setFormData({ ...formData, durationMinutes: parseInt(e.target.value) || 0 })}
-                              className="freight-input text-center py-1.5"
+                              className={`freight-input text-center py-1.5 ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                             />
                             <span className="text-xs text-gray-500 font-semibold">m</span>
                           </div>
@@ -2221,11 +2292,11 @@
                             handleReminderDurationChange(e.target.value);
                             setReminderValidationError("");
                           }}
-                          disabled={isPastActivityDate}
+                          disabled={isDrawerReadOnly || isPastActivityDate}
                           title={isPastActivityDate ? "Reminders cannot be configured for past activities." : "Select reminder duration"}
                           className={`freight-select ${
-                            isPastActivityDate 
-                              ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" 
+                            isDrawerReadOnly || isPastActivityDate
+                              ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300"
                               : ""
                           }`}
                         >
@@ -2246,16 +2317,16 @@
                             setFormData({ ...formData, customReminderDate: e.target.value, isReminderUserOverridden: true });
                             setReminderValidationError("");
                           }}
-                          readOnly={formData.reminderDurationMinutes !== "custom" || isPastActivityDate}
-                          disabled={isPastActivityDate || formData.reminderDurationMinutes === "none"}
+                          readOnly={isDrawerReadOnly || formData.reminderDurationMinutes !== "custom" || isPastActivityDate}
+                          disabled={isDrawerReadOnly || isPastActivityDate || formData.reminderDurationMinutes === "none"}
                           title={isPastActivityDate ? "Reminders cannot be configured for past activities." : (formData.reminderDurationMinutes === "custom" ? "Select custom reminder date and time" : "Calculated automatically from Remind before")}
                           className={`freight-input text-xs font-mono ${
-                            formData.reminderDurationMinutes === "custom" && !isPastActivityDate
+                            !isDrawerReadOnly && formData.reminderDurationMinutes === "custom" && !isPastActivityDate
                               ? (reminderValidationError ? "bg-white border-red-500 text-gray-900 focus:border-red-600 ring-1 ring-red-300" : "bg-white border-blue-400 text-gray-900 focus:border-[#0070d2]")
                               : "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300"
                           }`}
                         />
-                        {reminderValidationError && (
+                        {reminderValidationError && !isDrawerReadOnly && (
                           <div className="mt-1 flex items-start space-x-1 text-[11px] text-red-600 font-medium leading-tight animate-fadeIn">
                             <i className="fa-solid fa-circle-exclamation mt-0.5 text-[10px]"></i>
                             <span>{reminderValidationError}</span>
@@ -2270,8 +2341,9 @@
                         <label className="freight-label">Direction</label>
                         <select
                           value={formData.direction}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, direction: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Select Call Direction">Select Call Direction</option>
                           <option value="Inbound">Inbound</option>
@@ -2283,8 +2355,9 @@
                         <label className="freight-label">Purpose</label>
                         <select
                           value={formData.purpose}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Select Call Purpose">Select Call Purpose</option>
                           <option value="Sales Pitch">Sales Pitch</option>
@@ -2301,8 +2374,9 @@
                         <label className="freight-label">Outcome</label>
                         <select
                           value={formData.outcome}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Select Call Outcome">Select Call Outcome</option>
                           <option value="Interested">Interested</option>
@@ -2318,9 +2392,10 @@
                         </label>
                         <select
                           value={formData.status}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                           required
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="New">New</option>
                           <option value="In Progress">In Progress</option>
@@ -2336,8 +2411,9 @@
                         <label className="freight-label">Priority</label>
                         <select
                           value={formData.priority}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Low">Low</option>
                           <option value="Medium">Medium</option>
@@ -2349,8 +2425,9 @@
                         <label className="freight-label">Owner</label>
                         <select
                           value={formData.owner}
+                          disabled={isDrawerReadOnly}
                           onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
-                          className="freight-select"
+                          className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                         >
                           <option value="Shreshth Dubey">Shreshth Dubey</option>
                           <option value="Vikram Seth">Vikram Seth</option>
@@ -2362,7 +2439,10 @@
                     {/* Other Team Members */}
                     <div>
                       <label className="freight-label">Other Team Members</label>
-                      <select className="freight-select">
+                      <select
+                        disabled={isDrawerReadOnly}
+                        className={`freight-select ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
+                      >
                         <option value="">Select Team Members</option>
                         <option value="Vikram Seth">Vikram Seth</option>
                         <option value="Pooja Sharma">Pooja Sharma</option>
@@ -2376,9 +2456,10 @@
                       <textarea
                         rows="3"
                         placeholder="Enter notes"
+                        disabled={isDrawerReadOnly}
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        className="freight-input resize-y"
+                        className={`freight-input resize-y ${isDrawerReadOnly ? "bg-gray-100 text-gray-600 cursor-not-allowed border-gray-300" : ""}`}
                       ></textarea>
                     </div>
 
@@ -2386,20 +2467,41 @@
 
                   {/* Drawer Fixed Footer */}
                   <div className="px-6 py-3.5 border-t border-[#e5e7eb] bg-white flex items-center justify-end space-x-3 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsDrawerOpen(false)}
-                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveActivity}
-                      className="btn-freight-primary px-5 py-2 text-xs font-semibold rounded shadow-sm"
-                    >
-                      Save
-                    </button>
+                    {isDrawerReadOnly ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setIsDrawerOpen(false)}
+                          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsDrawerReadOnly(false)}
+                          className="btn-freight-primary px-5 py-2 text-xs font-semibold rounded shadow-sm"
+                        >
+                          Edit
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setIsDrawerOpen(false)}
+                          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveActivity}
+                          className="btn-freight-primary px-5 py-2 text-xs font-semibold rounded shadow-sm"
+                        >
+                          Save
+                        </button>
+                      </>
+                    )}
                   </div>
 
                 </div>
@@ -2842,130 +2944,6 @@
                         )}
                       </div>
 
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-
-
-            {/* ==================================================== */}
-            {/* VIEW ACTIVITY MODAL (3-Dot -> View)                  */}
-            {/* Allows inspecting Activity details with 'Edit' button */}
-            {/* ==================================================== */}
-            {viewActivityModal && (() => {
-              const act = viewActivityModal;
-              const isCustom = act.reminderDurationMinutes === "custom" || act.isCustomReminder;
-              const isNone = act.reminderDurationMinutes === "none" || act.hasReminder === false;
-              let reminderDisplay = "No Reminder";
-              if (!isNone) {
-                if (isCustom) {
-                  reminderDisplay = `Custom: ${act.customReminderDate ? dayjs(act.customReminderDate).format("MMM D, YYYY h:mm A") : "Not specified"}`;
-                } else {
-                  const opt = REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(act.reminderDurationMinutes));
-                  reminderDisplay = opt ? opt.label : `${act.reminderDurationMinutes} Minutes`;
-                }
-              }
-
-              return (
-                <div className="fixed inset-0 z-[240] flex items-center justify-center p-4">
-                  <div 
-                    className="fixed inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-200"
-                    onClick={() => setViewActivityModal(null)}
-                  ></div>
-
-                  <div className="relative bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[500px] overflow-hidden z-[250] text-xs">
-                    {/* Header */}
-                    <div className="bg-[#16325c] px-5 py-3.5 flex items-center justify-between text-white shadow-xs">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-sm text-white tracking-wide">View Activity</span>
-                        <span className="bg-blue-600/60 px-2 py-0.5 rounded text-[10px] font-mono text-blue-100">{act.id}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setViewActivityModal(null)}
-                        className="text-white hover:text-gray-200 text-base font-bold transition-colors cursor-pointer"
-                        title="Close"
-                      >
-                        <i className="fa-solid fa-xmark"></i>
-                      </button>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-5 space-y-3.5 bg-white max-h-[75vh] overflow-y-auto">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Title</span>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{act.title}</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Activity Type</span>
-                          <p className="font-semibold text-gray-800 mt-0.5">{act.activityType}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Status</span>
-                          <p className="font-semibold text-gray-800 mt-0.5">{act.status}</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Activity Date &amp; Time</span>
-                          <p className="font-semibold text-gray-800 mt-0.5">{dayjs(act.activityDate).format("MMM D, YYYY h:mm A")}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Reminder Schedule</span>
-                          <div className="mt-0.5">
-                            <span className="inline-block bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs border border-blue-200">
-                              <i className="fa-regular fa-bell mr-1 text-[10px]"></i>
-                              {reminderDisplay}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Party</span>
-                          <p className="text-gray-700 mt-0.5">{act.party || "--"}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Priority</span>
-                          <p className="text-gray-700 mt-0.5">{act.priority || "--"}</p>
-                        </div>
-                      </div>
-
-                      {act.notes && (
-                        <div className="pt-1 border-t border-gray-100">
-                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Notes</span>
-                          <p className="text-gray-700 mt-0.5 bg-slate-50 p-2 rounded border border-gray-200 text-xs">{act.notes}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-end space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setViewActivityModal(null)}
-                        className="px-4 py-1.5 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Close
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const target = viewActivityModal;
-                          setViewActivityModal(null);
-                          handleOpenEditDrawer(target);
-                        }}
-                        className="px-5 py-1.5 bg-[#0070d2] hover:bg-[#005fb3] text-white rounded text-xs font-semibold transition-colors cursor-pointer shadow-2xs flex items-center space-x-1.5"
-                      >
-                        <i className="fa-regular fa-pen-to-square text-xs"></i>
-                        <span>Edit Activity</span>
-                      </button>
                     </div>
                   </div>
                 </div>
