@@ -543,6 +543,9 @@
       const [selectedReminderCenterModal, setSelectedReminderCenterModal] = useState(null);
       const [openSettingsDropdownId, setOpenSettingsDropdownId] = useState(null);
       const [settingsModal, setSettingsModal] = useState(null); // { mode: 'view' | 'edit', item }
+      const [activeActivityActionMenu, setActiveActivityActionMenu] = useState(null); // activity id for open 3-dot menu
+      const [viewActivityModal, setViewActivityModal] = useState(null); // activity object for read-only view modal
+      const [reminderValidationError, setReminderValidationError] = useState(""); // inline error for custom reminder
 
       // Form State for Drawer
       const [formData, setFormData] = useState({
@@ -829,6 +832,7 @@
           teamMembers: [],
           notes: ""
         });
+        setReminderValidationError("");
         setIsDrawerOpen(true);
       };
 
@@ -861,6 +865,7 @@
           teamMembers: activity.teamMembers || [],
           notes: activity.notes || ""
         });
+        setReminderValidationError("");
         setIsDrawerOpen(true);
       };
 
@@ -913,6 +918,27 @@
 
         const actDate = dayjs(formData.activityDate);
         const now = dayjs(currentTime);
+
+        // Validation for Custom Reminder Date
+        if (formData.reminderDurationMinutes === "custom") {
+          if (!formData.customReminderDate) {
+            setReminderValidationError("Please specify a Reminder Date & Time.");
+            showToast("Please specify a Reminder Date & Time.", "error");
+            return;
+          }
+          const customRem = dayjs(formData.customReminderDate);
+          if (!customRem.isBefore(actDate)) {
+            setReminderValidationError("Reminder Date & Time must be earlier than the Activity Date.");
+            showToast("Reminder Date & Time must be earlier than the Activity Date.", "error");
+            return;
+          }
+          if (customRem.isBefore(now)) {
+            setReminderValidationError("Reminder Date & Time cannot be in the past.");
+            showToast("Reminder Date & Time cannot be in the past.", "error");
+            return;
+          }
+        }
+        setReminderValidationError("");
 
         let targetReminderDate;
         let isFutureAtSave = false;
@@ -1471,8 +1497,79 @@
 
                             return (
                               <tr key={act.id} className="cursor-pointer group">
-                                <td className="text-center text-gray-400">
-                                  <i className="fa-solid fa-ellipsis-vertical"></i>
+                                <td className="text-center text-gray-500 relative" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveActivityActionMenu(activeActivityActionMenu === act.id ? null : act.id)}
+                                    className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-800 transition-colors"
+                                    title="More Options"
+                                  >
+                                    <i className="fa-solid fa-ellipsis-vertical"></i>
+                                  </button>
+
+                                  {/* 3-Dot Dropdown Popover */}
+                                  {activeActivityActionMenu === act.id && (
+                                    <>
+                                      <div 
+                                        className="fixed inset-0 z-30" 
+                                        onClick={() => setActiveActivityActionMenu(null)}
+                                      ></div>
+                                      <div className="absolute left-6 top-2 z-40 bg-white border border-gray-200 rounded-lg shadow-xl py-1 w-36 text-left text-xs">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveActivityActionMenu(null);
+                                            handleOpenEditDrawer(act);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                        >
+                                          <i className="fa-regular fa-pen-to-square w-4 text-gray-400"></i>
+                                          <span>Edit</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveActivityActionMenu(null);
+                                            setViewActivityModal(act);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                        >
+                                          <i className="fa-regular fa-eye w-4 text-gray-400"></i>
+                                          <span>View</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveActivityActionMenu(null);
+                                            const copy = {
+                                              ...act,
+                                              id: `ACT-${Date.now().toString().slice(-4)}`,
+                                              title: `Copy of ${act.title}`,
+                                              createdAt: currentTime
+                                            };
+                                            setActivities([copy, ...activities]);
+                                            showToast(`Duplicated as "${copy.title}"`);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                        >
+                                          <i className="fa-regular fa-copy w-4 text-gray-400"></i>
+                                          <span>Duplicate</span>
+                                        </button>
+                                        <div className="border-t border-gray-100 my-1"></div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveActivityActionMenu(null);
+                                            handleDeleteActivity(act.id);
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-red-50 flex items-center space-x-2 text-red-600 transition-colors"
+                                        >
+                                          <i className="fa-regular fa-trash-can w-4 text-red-400"></i>
+                                          <span>Delete</span>
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
                                 </td>
 
                                 {/* Title */}
@@ -2120,8 +2217,12 @@
                         <label className="freight-label">Remind before</label>
                         <select
                           value={formData.reminderDurationMinutes}
-                          onChange={(e) => handleReminderDurationChange(e.target.value)}
+                          onChange={(e) => {
+                            handleReminderDurationChange(e.target.value);
+                            setReminderValidationError("");
+                          }}
                           disabled={isPastActivityDate}
+                          title={isPastActivityDate ? "Reminders cannot be configured for past activities." : "Select reminder duration"}
                           className={`freight-select ${
                             isPastActivityDate 
                               ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" 
@@ -2137,19 +2238,29 @@
                       </div>
 
                       <div>
-                        <label className="freight-label">Reminder Date &amp; Time</label>
+                        <label className="freight-label">Date &amp; Time</label>
                         <input
                           type="datetime-local"
                           value={formData.customReminderDate ? formData.customReminderDate.slice(0, 16) : ""}
-                          onChange={(e) => setFormData({ ...formData, customReminderDate: e.target.value, isReminderUserOverridden: true })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, customReminderDate: e.target.value, isReminderUserOverridden: true });
+                            setReminderValidationError("");
+                          }}
                           readOnly={formData.reminderDurationMinutes !== "custom" || isPastActivityDate}
                           disabled={isPastActivityDate || formData.reminderDurationMinutes === "none"}
+                          title={isPastActivityDate ? "Reminders cannot be configured for past activities." : (formData.reminderDurationMinutes === "custom" ? "Select custom reminder date and time" : "Calculated automatically from Remind before")}
                           className={`freight-input text-xs font-mono ${
                             formData.reminderDurationMinutes === "custom" && !isPastActivityDate
-                              ? "bg-white border-blue-400 text-gray-900 focus:border-[#0070d2]"
+                              ? (reminderValidationError ? "bg-white border-red-500 text-gray-900 focus:border-red-600 ring-1 ring-red-300" : "bg-white border-blue-400 text-gray-900 focus:border-[#0070d2]")
                               : "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300"
                           }`}
                         />
+                        {reminderValidationError && (
+                          <div className="mt-1 flex items-start space-x-1 text-[11px] text-red-600 font-medium leading-tight animate-fadeIn">
+                            <i className="fa-solid fa-circle-exclamation mt-0.5 text-[10px]"></i>
+                            <span>{reminderValidationError}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2731,6 +2842,130 @@
                         )}
                       </div>
 
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+
+
+            {/* ==================================================== */}
+            {/* VIEW ACTIVITY MODAL (3-Dot -> View)                  */}
+            {/* Allows inspecting Activity details with 'Edit' button */}
+            {/* ==================================================== */}
+            {viewActivityModal && (() => {
+              const act = viewActivityModal;
+              const isCustom = act.reminderDurationMinutes === "custom" || act.isCustomReminder;
+              const isNone = act.reminderDurationMinutes === "none" || act.hasReminder === false;
+              let reminderDisplay = "No Reminder";
+              if (!isNone) {
+                if (isCustom) {
+                  reminderDisplay = `Custom: ${act.customReminderDate ? dayjs(act.customReminderDate).format("MMM D, YYYY h:mm A") : "Not specified"}`;
+                } else {
+                  const opt = REMINDER_DURATION_OPTIONS.find(o => String(o.value) === String(act.reminderDurationMinutes));
+                  reminderDisplay = opt ? opt.label : `${act.reminderDurationMinutes} Minutes`;
+                }
+              }
+
+              return (
+                <div className="fixed inset-0 z-[240] flex items-center justify-center p-4">
+                  <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-[1px] transition-opacity duration-200"
+                    onClick={() => setViewActivityModal(null)}
+                  ></div>
+
+                  <div className="relative bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[500px] overflow-hidden z-[250] text-xs">
+                    {/* Header */}
+                    <div className="bg-[#16325c] px-5 py-3.5 flex items-center justify-between text-white shadow-xs">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-sm text-white tracking-wide">View Activity</span>
+                        <span className="bg-blue-600/60 px-2 py-0.5 rounded text-[10px] font-mono text-blue-100">{act.id}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setViewActivityModal(null)}
+                        className="text-white hover:text-gray-200 text-base font-bold transition-colors cursor-pointer"
+                        title="Close"
+                      >
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-5 space-y-3.5 bg-white max-h-[75vh] overflow-y-auto">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Title</span>
+                        <p className="text-sm font-bold text-gray-900 mt-0.5">{act.title}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Activity Type</span>
+                          <p className="font-semibold text-gray-800 mt-0.5">{act.activityType}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Status</span>
+                          <p className="font-semibold text-gray-800 mt-0.5">{act.status}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Activity Date &amp; Time</span>
+                          <p className="font-semibold text-gray-800 mt-0.5">{dayjs(act.activityDate).format("MMM D, YYYY h:mm A")}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Reminder Schedule</span>
+                          <div className="mt-0.5">
+                            <span className="inline-block bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs border border-blue-200">
+                              <i className="fa-regular fa-bell mr-1 text-[10px]"></i>
+                              {reminderDisplay}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Party</span>
+                          <p className="text-gray-700 mt-0.5">{act.party || "--"}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Priority</span>
+                          <p className="text-gray-700 mt-0.5">{act.priority || "--"}</p>
+                        </div>
+                      </div>
+
+                      {act.notes && (
+                        <div className="pt-1 border-t border-gray-100">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Notes</span>
+                          <p className="text-gray-700 mt-0.5 bg-slate-50 p-2 rounded border border-gray-200 text-xs">{act.notes}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-end space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setViewActivityModal(null)}
+                        className="px-4 py-1.5 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = viewActivityModal;
+                          setViewActivityModal(null);
+                          handleOpenEditDrawer(target);
+                        }}
+                        className="px-5 py-1.5 bg-[#0070d2] hover:bg-[#005fb3] text-white rounded text-xs font-semibold transition-colors cursor-pointer shadow-2xs flex items-center space-x-1.5"
+                      >
+                        <i className="fa-regular fa-pen-to-square text-xs"></i>
+                        <span>Edit Activity</span>
+                      </button>
                     </div>
                   </div>
                 </div>
